@@ -1,66 +1,69 @@
 {
-    "versionLabel": "2.40",
-    "uuid": "1fb4a901-0c56-427d-a53e-3f423c8b589e",
     "appKeys": {},
-    "longName": "Pip Boy 100",
-    "versionCode": 7,
     "capabilities": [
-        ""
+        "location",
+        "configurable",
+        "health"
     ],
-    "shortName": "Pip Boy 100",
-    "companyName": "Bert de Ruiter",
-    "watchapp": {
-        "watchface": true
-    },
+    "companyName": "north-40",
+    "longName": "Pip Boy 100A",
+    "projectType": "native",
     "resources": {
         "media": [
             {
-                "menuIcon": true,
-                "type": "png",
-                "name": "ICON",
-                "file": "images/icon.png"
-            },
-            {
-                "type": "png",
-                "name": "BACKGROUND",
-                "file": "images/pipboy_bg.png"
-            },
-            {
-                "type": "png",
+                "file": "images/vault_boy.png",
                 "name": "VAULT_BOY",
-                "file": "images/vault_boy.png"
+                "type": "png"
             },
             {
-                "type": "png",
-                "name": "CRIPPLED_1",
-                "file": "images/crippled1.png"
+                "file": "images/pipboy_bg.png",
+                "name": "BACKGROUND",
+                "type": "png"
             },
             {
-                "type": "png",
-                "name": "CRIPPLED_2",
-                "file": "images/crippled2.png"
+                "file": "images/icon.png",
+                "menuIcon": true,
+                "name": "ICON",
+                "type": "png"
             },
             {
-                "type": "png",
-                "name": "CRIPPLED_3",
-                "file": "images/crippled3.png"
-            },
-            {
-                "type": "png",
-                "name": "CRIPPLED_4",
-                "file": "images/crippled4.png"
-            },
-            {
-                "type": "png",
-                "name": "CRIPPLED_5",
-                "file": "images/crippled5.png"
-            },
-            {
-                "type": "png",
+                "file": "images/dead.png",
                 "name": "DEAD",
-                "file": "images/dead.png"
+                "type": "png"
+            },
+            {
+                "file": "images/crippled5.png",
+                "name": "CRIPPLED_5",
+                "type": "png"
+            },
+            {
+                "file": "images/crippled4.png",
+                "name": "CRIPPLED_4",
+                "type": "png"
+            },
+            {
+                "file": "images/crippled3.png",
+                "name": "CRIPPLED_3",
+                "type": "png"
+            },
+            {
+                "file": "images/crippled2.png",
+                "name": "CRIPPLED_2",
+                "type": "png"
+            },
+            {
+                "file": "images/crippled1.png",
+                "name": "CRIPPLED_1",
+                "type": "png"
             }
-            
         ]
+    },
+    "sdkVersion": "2",
+    "shortName": "Pip Boy 100A",
+    "uuid": "be4b8310-7fdb-4f84-9d93-1eb7d3d25561",
+    "versionCode": 1,
+    "versionLabel": "3.0",
+    "watchapp": {
+        "watchface": true
     }
 }
