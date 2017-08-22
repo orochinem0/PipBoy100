@@ -1,11 +1,15 @@
-//Copyright 2013 Bert de Ruiter (www.bertderuiter.nl/)
+// Copyright 2013 Bert de Ruiter (www.bertderuiter.nl/)
+// Copyright 2017 nem0 (www.nem0.net)
 
+// INCLUDES
 #include "pebble.h"
 #include "config.h"
 
+// NEW VARIABLES
+static Window *s_main_window;
 
-
-static Window *window; 
+// OLD VARIABLES
+/*static Window *window; 
 static TextLayer *time_layer; 
 static TextLayer *date_layer;
 static TextLayer *battery_layer;
@@ -29,16 +33,16 @@ static GBitmap *vaultBoy;
 static uint8_t currentVaultBoy = RESOURCE_ID_VAULT_BOY;
 
 static uint8_t loadedImage = 0;
-static bool dead = false;
+static bool dead = false;*/
 
 
 //X = MULT * L * L - MULT * L
-static int getXpForNextLvl() {
+/*static int getXpForNextLvl() {
 	int nextLvl = lvl_counter + 1;
 	return xp_multiplier * nextLvl * nextLvl  - xp_multiplier * nextLvl;
-}
+}*/
 
-float my_sqrt(float num) {
+/*float my_sqrt(float num) {
   float a, p, e = 0.001, b;
   a = num;
   p = a * a;
@@ -49,8 +53,9 @@ float my_sqrt(float num) {
     p = a * a;
   }
   return a;
-}
-static bool canGainXP(AccelData *accel) {
+}*/
+
+/*static bool canGainXP(AccelData *accel) {
 	int16_t lastX = totalAccel.lastX;
 	int16_t lastY = totalAccel.lastY;
 	int16_t lastZ = totalAccel.lastZ;
@@ -70,17 +75,19 @@ static bool canGainXP(AccelData *accel) {
 	APP_LOG(APP_LOG_LEVEL_DEBUG,"No XP");
 	return false;
 
-}
-static int getCurrentLvlFromXP() {
-	return (int)((xp_multiplier + my_sqrt(xp_multiplier * xp_multiplier - 4 * xp_multiplier * (-xp_counter) ))/ (2 * xp_multiplier));
-}
+}*/
 
-static void updateXpLayer() {
+/*static int getCurrentLvlFromXP() {
+	return (int)((xp_multiplier + my_sqrt(xp_multiplier * xp_multiplier - 4 * xp_multiplier * (-xp_counter) ))/ (2 * xp_multiplier));
+}*/
+
+/*static void updateXpLayer() {
 	static char xp[15];
 	snprintf(xp, sizeof(xp), "XP    %lu", xp_counter);	
 	text_layer_set_text(xp_layer, xp);
-}
-static void updateLvlNextLayers() {	
+}*/
+
+/*static void updateLvlNextLayers() {	
 	static char nextLvl[15];
 	static char lvl[10];
 	
@@ -88,9 +95,9 @@ static void updateLvlNextLayers() {
 	text_layer_set_text(lvl_layer, lvl);
 	snprintf(nextLvl, sizeof(nextLvl), "Next %lu", xp_needed);	
 	text_layer_set_text(nextLvl_layer, nextLvl);
-}
+}*/
 
-static uint16_t getModulo(AccelData *data) {
+/*static uint16_t getModulo(AccelData *data) {
 	uint16_t smallest;
 	uint8_t nbAccel = totalAccel.total;
 	
@@ -109,8 +116,9 @@ static uint16_t getModulo(AccelData *data) {
 	
 	APP_LOG(APP_LOG_LEVEL_DEBUG,"DIV : (%i,%i,%i)",divergX,divergY,divergZ);
 	return smallest;
-}
-static void loadVaultBoyState(uint8_t ressource) {
+}*/
+
+/*static void loadVaultBoyState(uint8_t ressource) {
 	APP_LOG(APP_LOG_LEVEL_DEBUG,"Load image %i",ressource);
 	if (vaultBoy) {
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Pointer instancied");
@@ -126,9 +134,9 @@ static void loadVaultBoyState(uint8_t ressource) {
 	vaultBoy = gbitmap_create_with_resource(ressource);	
     bitmap_layer_set_bitmap(vaultBoy_layer, vaultBoy); 
     loadedImage = ressource;  
-}
+}*/
 
-static void killVaultBoy() {
+/*static void killVaultBoy() {
 	dead = true;
 	loadVaultBoyState(RESOURCE_ID_DEAD);
 	currentVaultBoy = RESOURCE_ID_VAULT_BOY;
@@ -139,9 +147,9 @@ static void killVaultBoy() {
 	updateLvlNextLayers();
 	vibes_long_pulse();
 	
-}
+}*/
 
-static void vaultBoy_status() {
+/*static void vaultBoy_status() {
 	
 	if(battery_state_service_peek().is_charging  && currentVaultBoy > RESOURCE_ID_VAULT_BOY) {
 		loadVaultBoyState(--currentVaultBoy);
@@ -165,9 +173,9 @@ static void vaultBoy_status() {
 	persist_write_int(PIPE_LAST_GAIN,lastGain);
 	persist_write_int(PIPE_LAST_XP,lastXp);
 	persist_write_int(PIPE_CURRENT_CRIPPLED,currentVaultBoy);
-}
+}*/
 
-static void handle_battery(BatteryChargeState charge_state) {
+/*static void handle_battery(BatteryChargeState charge_state) {
   static char battery_text[15];
 
   if (charge_state.is_charging) {
@@ -176,8 +184,9 @@ static void handle_battery(BatteryChargeState charge_state) {
     snprintf(battery_text, sizeof(battery_text), "HP %d/100", charge_state.charge_percent);
   }
   text_layer_set_text(battery_layer, battery_text);
-}
-static void setTimeLayers(struct tm* tick_time, TimeUnits units_changed) {
+}*/
+
+/*static void setTimeLayers(struct tm* tick_time, TimeUnits units_changed) {
 	static char time_text[6]; 
 	char *time_format;
 	char *date_format;
@@ -199,8 +208,9 @@ static void setTimeLayers(struct tm* tick_time, TimeUnits units_changed) {
 		strftime(date_text, sizeof(date_text), date_format, tick_time);
 		text_layer_set_text(date_layer, date_text);
 	}
-}
-static void handle_second_tick(struct tm* tick_time, TimeUnits units_changed) {
+}*/
+
+/*static void handle_second_tick(struct tm* tick_time, TimeUnits units_changed) {
 
 	if(!(units_changed & MINUTE_UNIT)) {
 		return;
@@ -254,9 +264,9 @@ static void handle_second_tick(struct tm* tick_time, TimeUnits units_changed) {
 		vaultBoy_status();		
 	}
 
-}
+}*/
 
-void update_date_text(){
+/*void update_date_text(){
 	time_t now = time(NULL);
     struct tm *current_time = localtime(&now);
 	static char date_text[20];
@@ -268,25 +278,45 @@ void update_date_text(){
     }
 	strftime(date_text, sizeof(date_text), date_format, current_time);
   	text_layer_set_text(date_layer, date_text);
-}
+}*/
 
-
-static void handle_bluetooth(bool connected) {
+/*static void handle_bluetooth(bool connected) {
    if (connected) {
     vibes_enqueue_custom_pattern(BLUETOOTH_CONNECT_VIBE);
   } else{
     vibes_enqueue_custom_pattern(BLUETOOTH_DISCONNECT_VIBE);
   }
-}
+}*/
 
-
-static void handle_accel(AccelData *accel_data, uint32_t num_samples) {
+/*static void handle_accel(AccelData *accel_data, uint32_t num_samples) {
   //doing nothing here
+}*/
+
+// WINDOW : LOAD
+static void main_window_load(Window *window) {
+	// blank
 }
 
+// WINDOW : UNLOAD
+static void main_window_unload(Window *window) {
+	// blank
+}
 
-static void do_init(void) {
-  srand(time(NULL));
+// INITIALIZE
+static void init(void) {
+	// Create main Window element and assign to pointer
+  	s_main_window = window_create();
+
+  	// Set handlers to manage the elements inside the Window
+  	window_set_window_handlers(s_main_window, (WindowHandlers) {
+    		.load = main_window_load,
+    		.unload = main_window_unload
+  	});
+
+  // Show the Window on the watch, with animated=true
+  window_stack_push(s_main_window, true);
+	
+/*  srand(time(NULL));
   xp_multiplier = 28;
   if(persist_exists(PIPEXP)){
 	xp_counter = persist_read_int(PIPEXP);
@@ -393,13 +423,15 @@ static void do_init(void) {
  
   update_date_text();
   updateLvlNextLayers();
-  updateXpLayer();
+  updateXpLayer();*/
 }
 
-
-
-static void do_deinit(void) {
-  persist_write_int(PIPEXP, xp_counter);
+// DEINITIALIZE
+static void deinit(void) {
+	// Destroy Window
+  	window_destroy(s_main_window);
+	
+  /*persist_write_int(PIPEXP, xp_counter);
   persist_write_int(PIPE_LAST_XP, lastXp);
   persist_write_int(PIPE_LAST_GAIN,lastGain);
   persist_write_int(PIPE_CURRENT_CRIPPLED,currentVaultBoy);
@@ -426,12 +458,12 @@ static void do_deinit(void) {
 	if (image_layer) {
     	free(image_layer);
     } 
-  window_destroy(window);
+  window_destroy(window);*/
 }
 
-
+// RUN APPLICATION
 int main(void) {
-  do_init();
+  init();
   app_event_loop();
-  do_deinit();
+  deinit();
 }
