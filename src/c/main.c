@@ -364,7 +364,7 @@ static void main_window_load(Window *window) {
   text_layer_set_background_color(s_lvl_layer, GColorClear);
   text_layer_set_font(s_lvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_lvl_layer, GTextAlignmentCenter);
-  text_layer_set_text(s_lvl_layer, "Level 1");
+	text_layer_set_text(s_lvl_layer, "Level 1");
 
   // Add each layer as a child layer to the Window's root layer
 	layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
@@ -378,7 +378,9 @@ static void main_window_load(Window *window) {
 // WINDOW : UNLOAD
 static void main_window_unload(Window *window) {
 	gbitmap_destroy(s_background_bitmap);
+	gbitmap_destroy(s_vaultBoy_Bitmap);
 	bitmap_layer_destroy(s_background_layer);
+	bitmap_layer_destroy(s_vaultBoy_layer);
 
   text_layer_destroy(s_time_layer);
   text_layer_destroy(s_battery_layer);
