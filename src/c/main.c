@@ -7,33 +7,44 @@
 
 // NEW VARIABLES
 static Window *s_main_window;
+static TextLayer *s_time_layer;
+static TextLayer *s_battery_layer;
+static TextLayer *s_date_layer;
+static TextLayer *s_xp_layer;
+static TextLayer *s_nextLvl_layer;
+static TextLayer *s_lvl_layer;
+
+static BitmapLayer *s_background_layer;
+static BitmapLayer *s_vaultBoy_layer;
+
+static GBitmap *s_background_bitmap;
+static GBitmap *s_vaultBoy_Bitmap;
 
 // OLD VARIABLES
-/*static Window *window; 
-static TextLayer *time_layer; 
-static TextLayer *date_layer;
-static TextLayer *battery_layer;
-static TextLayer *xp_layer;
-static TextLayer *nextLvl_layer;
-static TextLayer *lvl_layer;
+//static TextLayer *time_layer; 
+//static TextLayer *date_layer;
+//static TextLayer *battery_layer;
+//static TextLayer *xp_layer;
+//static TextLayer *nextLvl_layer;
+//static TextLayer *lvl_layer;
 
-static BitmapLayer *image_layer;
-static BitmapLayer *vaultBoy_layer;
-static uint32_t xp_counter = 0;
-static uint32_t xp_needed;
-static uint8_t xp_multiplier;
-static uint32_t lvl_counter;
-static uint32_t lastXp = 0;
-static uint32_t lastGain = 0;
+//static BitmapLayer *image_layer;
+//static BitmapLayer *vaultBoy_layer;
+//static uint32_t xp_counter = 0;
+//static uint32_t xp_needed;
+//static uint8_t xp_multiplier;
+//static uint32_t lvl_counter;
+//static uint32_t lastXp = 0;
+//static uint32_t lastGain = 0;
 
-static AccelTotal totalAccel = {0,0,0,0,0,0,0};
+//static AccelTotal totalAccel = {0,0,0,0,0,0,0};
 	
-static GBitmap *image;
-static GBitmap *vaultBoy;
-static uint8_t currentVaultBoy = RESOURCE_ID_VAULT_BOY;
+//static GBitmap *image;
+//static GBitmap *vaultBoy;
+//static uint8_t currentVaultBoy = RESOURCE_ID_VAULT_BOY;
 
-static uint8_t loadedImage = 0;
-static bool dead = false;*/
+//static uint8_t loadedImage = 0;
+//static bool dead = false;
 
 
 //X = MULT * L * L - MULT * L
@@ -152,8 +163,8 @@ static bool dead = false;*/
 /*static void vaultBoy_status() {
 	
 	if(battery_state_service_peek().is_charging  && currentVaultBoy > RESOURCE_ID_VAULT_BOY) {
-		loadVaultBoyState(--currentVaultBoy);
-		persist_write_int(PIPE_CURRENT_CRIPPLED,currentVaultBoy);
+		//loadVaultBoyState(--currentVaultBoy);
+		//persist_write_int(PIPE_CURRENT_CRIPPLED,currentVaultBoy);
 		return;
 	}
 	
@@ -186,29 +197,28 @@ static bool dead = false;*/
   text_layer_set_text(battery_layer, battery_text);
 }*/
 
-/*static void setTimeLayers(struct tm* tick_time, TimeUnits units_changed) {
-	static char time_text[6]; 
-	char *time_format;
-	char *date_format;
-	
-	if (clock_is_24h_style()) {
-    	time_format = "%R";
-		date_format = "%d-%m-%Y";
-    } else {
-    	time_format = "%I:%M";
-		date_format = "%m-%d-%Y";
-    }
-	
-	strftime(time_text, sizeof(time_text), time_format, tick_time);
-	text_layer_set_text(time_layer, time_text);
+static void update_time() {
+  // Get a tm structure
+  time_t temp = time(NULL);
+  struct tm *tick_time = localtime(&temp);
 
-	
-  	if (units_changed & DAY_UNIT) {
+  // Write the current hours and minutes into a buffer
+  static char s_buffer[8];
+  strftime(s_buffer, sizeof(s_buffer), clock_is_24h_style() ? "%H:%M" : "%I:%M", tick_time);
+
+  // Display this time on the TextLayer
+  text_layer_set_text(s_time_layer, s_buffer);
+}
+
+
+static void tick_handler(struct tm* tick_time, TimeUnits units_changed) {
+  /*if (units_changed & DAY_UNIT) {
 		static char date_text[20];
 		strftime(date_text, sizeof(date_text), date_format, tick_time);
 		text_layer_set_text(date_layer, date_text);
-	}
-}*/
+	}*/
+	update_time();
+}
 
 /*static void handle_second_tick(struct tm* tick_time, TimeUnits units_changed) {
 
@@ -235,7 +245,6 @@ static bool dead = false;*/
 	if(!canGainXP(&accel)) {
 		return;
 	}
-
 		
 	if(totalAccel.total > 1){
 		uint16_t modulo = getModulo(&accel) + 10;
@@ -257,13 +266,10 @@ static bool dead = false;*/
 		updateLvlNextLayers();
 	}
 	
-
-	
 	if(totalAccel.total == RESET_TOTAL_MIN) {
 		totalAccel = (AccelTotal){0,0,0,0,0,0,0};
 		vaultBoy_status();		
 	}
-
 }*/
 
 /*void update_date_text(){
@@ -294,161 +300,140 @@ static bool dead = false;*/
 
 // WINDOW : LOAD
 static void main_window_load(Window *window) {
-	// blank
+  // Get information about the Window
+  Layer *window_layer = window_get_root_layer(window);
+  GRect frame = layer_get_bounds(window_layer);
+	
+	// Draw Background
+	s_background_bitmap = gbitmap_create_with_resource(RESOURCE_ID_BACKGROUND);
+	s_background_layer = bitmap_layer_create(frame);
+	bitmap_layer_set_bitmap(s_background_layer, s_background_bitmap);
+	layer_add_child(window_layer, bitmap_layer_get_layer(s_background_layer));
+	
+	// Draw Vault Boy
+	s_vaultBoy_Bitmap = gbitmap_create_with_resource(RESOURCE_ID_VAULT_BOY);
+	s_vaultBoy_layer = bitmap_layer_create(GRect(3, 26, frame.size.w, 100));
+  //loadVaultBoyState(currentVaultBoy);		
+  bitmap_layer_set_bitmap(s_vaultBoy_layer, s_vaultBoy_Bitmap);
+  bitmap_layer_set_alignment(s_vaultBoy_layer, GAlignCenter);
+  layer_add_child(window_layer, bitmap_layer_get_layer(s_vaultBoy_layer));
+	
+	// Create Time child layer
+	s_time_layer = text_layer_create(GRect(-8, 133, frame.size.w , 34));
+  text_layer_set_text_color(s_time_layer, GColorWhite);
+  text_layer_set_background_color(s_time_layer, GColorClear);
+  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+  text_layer_set_text_alignment(s_time_layer, GTextAlignmentRight);
+	//text_layer_set_text(s_time_layer, "12:00");
+	
+	// Create Battery child layer
+	s_battery_layer = text_layer_create(GRect(-8, 4, frame.size.w, 34));
+  text_layer_set_text_color(s_battery_layer, GColorWhite);
+  text_layer_set_background_color(s_battery_layer, GColorClear);
+  text_layer_set_font(s_battery_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_battery_layer, GTextAlignmentRight);
+  text_layer_set_text(s_battery_layer, "HP 100/100");
+	
+	// Create Date child layer
+	s_date_layer = text_layer_create(GRect(8, 4, frame.size.w, 34));
+  text_layer_set_text_color(s_date_layer, GColorWhite);
+  text_layer_set_background_color(s_date_layer, GColorClear);
+  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_date_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_date_layer, "1-1-2013");
+	
+	// Create XP child layer
+	s_xp_layer = text_layer_create(GRect(8, 133, frame.size.w, 34));
+  text_layer_set_text_color(s_xp_layer, GColorWhite);
+  text_layer_set_background_color(s_xp_layer, GColorClear);
+  text_layer_set_font(s_xp_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_xp_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_xp_layer, "XP");
+	
+	// Create Next Level child layer
+	s_nextLvl_layer = text_layer_create(GRect(8, 146, frame.size.w, 34));
+  text_layer_set_text_color(s_nextLvl_layer, GColorWhite);
+  text_layer_set_background_color(s_nextLvl_layer, GColorClear);
+  text_layer_set_font(s_nextLvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_nextLvl_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_nextLvl_layer, "Next");
+	
+	// Create Level child layer
+	s_lvl_layer = text_layer_create(GRect(0, 121, frame.size.w, 34));
+  text_layer_set_text_color(s_lvl_layer, GColorWhite);
+  text_layer_set_background_color(s_lvl_layer, GColorClear);
+  text_layer_set_font(s_lvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_lvl_layer, GTextAlignmentCenter);
+  text_layer_set_text(s_lvl_layer, "Level 1");
+
+  // Add each layer as a child layer to the Window's root layer
+	layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_battery_layer));
+	layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
+	layer_add_child(window_layer, text_layer_get_layer(s_xp_layer));
+	layer_add_child(window_layer, text_layer_get_layer(s_nextLvl_layer));
+	layer_add_child(window_layer, text_layer_get_layer(s_lvl_layer));
 }
 
 // WINDOW : UNLOAD
 static void main_window_unload(Window *window) {
-	// blank
+	gbitmap_destroy(s_background_bitmap);
+	bitmap_layer_destroy(s_background_layer);
+
+  text_layer_destroy(s_time_layer);
+  text_layer_destroy(s_battery_layer);
+	text_layer_destroy(s_date_layer);
+	text_layer_destroy(s_xp_layer);
+	text_layer_destroy(s_nextLvl_layer);
+	text_layer_destroy(s_lvl_layer);
 }
 
 // INITIALIZE
 static void init(void) {
 	// Create main Window element and assign to pointer
-  	s_main_window = window_create();
+  s_main_window = window_create();
 
-  	// Set handlers to manage the elements inside the Window
-  	window_set_window_handlers(s_main_window, (WindowHandlers) {
-    		.load = main_window_load,
-    		.unload = main_window_unload
-  	});
-
-  // Show the Window on the watch, with animated=true
-  window_stack_push(s_main_window, true);
+  // Set handlers to manage the elements inside the Window
+  window_set_window_handlers(s_main_window, (WindowHandlers) {
+  	.load = main_window_load,
+    .unload = main_window_unload
+  });
 	
-/*  srand(time(NULL));
-  xp_multiplier = 28;
-  if(persist_exists(PIPEXP)){
-	xp_counter = persist_read_int(PIPEXP);
-  }
-  
-  if(persist_exists(PIPE_LAST_XP)) {
-	  lastXp = persist_read_int(PIPE_LAST_XP);
-  }
-  
-  if(persist_exists(PIPE_LAST_GAIN)) {
-	  lastGain = persist_read_int(PIPE_LAST_GAIN);
-  }
-  
-  if(persist_exists(PIPE_CURRENT_CRIPPLED)) {
-	  currentVaultBoy = persist_read_int(PIPE_CURRENT_CRIPPLED);
-	  dead = (currentVaultBoy == RESOURCE_ID_DEAD);
-  }
-  
-  if(persist_exists(PIPE_TOTAL)) {
-	 persist_read_data(PIPE_TOTAL, &totalAccel, sizeof(totalAccel));
-	 APP_LOG(APP_LOG_LEVEL_DEBUG,"totalAccel : (%i,%i,%i) -- %i",totalAccel.x,totalAccel.y,totalAccel.z,totalAccel.total);
-  }
-  
-  
-  lvl_counter = getCurrentLvlFromXP();
-  xp_needed = getXpForNextLvl();
-
-  window = window_create();
-  window_stack_push(window, true);
-  window_set_background_color(window, GColorBlack);
-
-  Layer *root_layer = window_get_root_layer(window);
-  GRect frame = layer_get_frame(root_layer);
-  
-  image = gbitmap_create_with_resource(RESOURCE_ID_BACKGROUND);	
-  image_layer = bitmap_layer_create(frame);
-  bitmap_layer_set_bitmap(image_layer, image);
-  bitmap_layer_set_alignment(image_layer, GAlignCenter);
-  layer_add_child(root_layer, bitmap_layer_get_layer(image_layer));
+	window_set_background_color(s_main_window, GColorBlack);
 	
-  vaultBoy_layer = bitmap_layer_create(GRect(3, 26, frame.size.w, 100));
-  loadVaultBoyState(currentVaultBoy);		
-  bitmap_layer_set_bitmap(vaultBoy_layer, vaultBoy);
-  bitmap_layer_set_alignment(vaultBoy_layer, GAlignCenter);
-  layer_add_child(root_layer, bitmap_layer_get_layer(vaultBoy_layer));	
+	// Register with TickTimerService
+	tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 	
-  time_layer = text_layer_create(GRect(-8, 133, frame.size.w , 34));
-  text_layer_set_text_color(time_layer, GColorWhite);
-  text_layer_set_background_color(time_layer, GColorClear);
-  text_layer_set_font(time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
-  text_layer_set_text_alignment(time_layer, GTextAlignmentRight);
-
-  battery_layer = text_layer_create(GRect(-8, 4, frame.size.w, 34));
-  text_layer_set_text_color(battery_layer, GColorWhite);
-  text_layer_set_background_color(battery_layer, GColorClear);
-  text_layer_set_font(battery_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(battery_layer, GTextAlignmentRight);
-  text_layer_set_text(battery_layer, "HP 100/100");
+  /**/
 	
-  date_layer = text_layer_create(GRect(8, 4, frame.size.w, 34));
-  text_layer_set_text_color(date_layer, GColorWhite);
-  text_layer_set_background_color(date_layer, GColorClear);
-  text_layer_set_font(date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(date_layer, GTextAlignmentLeft);
-  text_layer_set_text(date_layer, "1-1-2013");
-	
-  xp_layer = text_layer_create(GRect(8, 133, frame.size.w, 34));
-  text_layer_set_text_color(xp_layer, GColorWhite);
-  text_layer_set_background_color(xp_layer, GColorClear);
-  text_layer_set_font(xp_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(xp_layer, GTextAlignmentLeft);
-  text_layer_set_text(xp_layer, "XP");
-  
-  
-  nextLvl_layer = text_layer_create(GRect(8, 146, frame.size.w, 34));
-  text_layer_set_text_color(nextLvl_layer, GColorWhite);
-  text_layer_set_background_color(nextLvl_layer, GColorClear);
-  text_layer_set_font(nextLvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(nextLvl_layer, GTextAlignmentLeft);
-  text_layer_set_text(nextLvl_layer, "Next");		
-	
-  lvl_layer = text_layer_create(GRect(0, 121, frame.size.w, 34));
-  text_layer_set_text_color(lvl_layer, GColorWhite);
-  text_layer_set_background_color(lvl_layer, GColorClear);
-  text_layer_set_font(lvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(lvl_layer, GTextAlignmentCenter);
-  text_layer_set_text(lvl_layer, "Level 1");	
-	
-  time_t now = time(NULL);
-  struct tm *current_time = localtime(&now);
-  handle_battery(battery_state_service_peek());
+  //time_t now = time(NULL);
+  //struct tm *current_time = localtime(&now);
+  /*handle_battery(battery_state_service_peek());
   accel_data_service_subscribe(0, &handle_accel);
   setTimeLayers(current_time,SECOND_UNIT);
   tick_timer_service_subscribe(MINUTE_UNIT, &handle_second_tick);
   battery_state_service_subscribe(&handle_battery);
-  bluetooth_connection_service_subscribe(&handle_bluetooth);
-  
-  layer_add_child(root_layer, text_layer_get_layer(time_layer));
-  layer_add_child(root_layer, text_layer_get_layer(battery_layer));
-  layer_add_child(root_layer, text_layer_get_layer(date_layer));
-  layer_add_child(root_layer, text_layer_get_layer(xp_layer));
-  layer_add_child(root_layer, text_layer_get_layer(nextLvl_layer));
-  layer_add_child(root_layer, text_layer_get_layer(lvl_layer));	
- 
-  update_date_text();
-  updateLvlNextLayers();
-  updateXpLayer();*/
+  bluetooth_connection_service_subscribe(&handle_bluetooth);*/
+	
+  // Show the Window on the watch, with animated=true
+  window_stack_push(s_main_window, true);	
+	update_time();
 }
 
 // DEINITIALIZE
 static void deinit(void) {
-	// Destroy Window
-  	window_destroy(s_main_window);
-	
   /*persist_write_int(PIPEXP, xp_counter);
   persist_write_int(PIPE_LAST_XP, lastXp);
   persist_write_int(PIPE_LAST_GAIN,lastGain);
   persist_write_int(PIPE_CURRENT_CRIPPLED,currentVaultBoy);
   persist_write_data(PIPE_TOTAL, &totalAccel, sizeof(totalAccel));
+	
   tick_timer_service_unsubscribe();
   battery_state_service_unsubscribe();
   bluetooth_connection_service_unsubscribe();
+  accel_data_service_unsubscribe();*/
   
-  accel_data_service_unsubscribe();
-  text_layer_destroy(time_layer);
-  text_layer_destroy(battery_layer);
-  text_layer_destroy(date_layer);
-  text_layer_destroy(xp_layer);
-  text_layer_destroy(lvl_layer);
-  text_layer_destroy(nextLvl_layer);
-  
-  bitmap_layer_destroy(image_layer);
+  /*bitmap_layer_destroy(image_layer);
   gbitmap_destroy(image);
   bitmap_layer_destroy(vaultBoy_layer);
   gbitmap_destroy(vaultBoy);	
@@ -457,8 +442,10 @@ static void deinit(void) {
     } 
 	if (image_layer) {
     	free(image_layer);
-    } 
-  window_destroy(window);*/
+    }*/
+	
+	// Destroy Window*/
+  window_destroy(s_main_window);
 }
 
 // RUN APPLICATION

@@ -1,0 +1,78 @@
+{
+    "author": "north-40",
+    "dependencies": {},
+    "keywords": [],
+    "name": "pip-boy-100a",
+    "pebble": {
+        "capabilities": [
+            "location",
+            "configurable",
+            "health"
+        ],
+        "displayName": "Pip Boy 100A",
+        "enableMultiJS": false,
+        "messageKeys": [],
+        "projectType": "native",
+        "resources": {
+            "media": [
+                {
+                    "file": "images/vault_boy.png",
+                    "name": "VAULT_BOY",
+                    "type": "png"
+                },
+                {
+                    "file": "images/pipboy_bg.png",
+                    "name": "BACKGROUND",
+                    "type": "png"
+                },
+                {
+                    "file": "images/icon.png",
+                    "menuIcon": true,
+                    "name": "ICON",
+                    "type": "png"
+                },
+                {
+                    "file": "images/dead.png",
+                    "name": "DEAD",
+                    "type": "png"
+                },
+                {
+                    "file": "images/crippled5.png",
+                    "name": "CRIPPLED_5",
+                    "type": "png"
+                },
+                {
+                    "file": "images/crippled4.png",
+                    "name": "CRIPPLED_4",
+                    "type": "png"
+                },
+                {
+                    "file": "images/crippled3.png",
+                    "name": "CRIPPLED_3",
+                    "type": "png"
+                },
+                {
+                    "file": "images/crippled2.png",
+                    "name": "CRIPPLED_2",
+                    "type": "png"
+                },
+                {
+                    "file": "images/crippled1.png",
+                    "name": "CRIPPLED_1",
+                    "type": "png"
+                }
+            ]
+        },
+        "sdkVersion": "3",
+        "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "diorite"
+        ],
+        "uuid": "be4b8310-7fdb-4f84-9d93-1eb7d3d25561",
+        "watchapp": {
+            "watchface": true
+        }
+    },
+    "version": "3.0.0"
+}
