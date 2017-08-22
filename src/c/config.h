@@ -1,4 +1,8 @@
-#pragma once
+#ifndef config_h_
+#define config_h_
+#endif
+
+/*#pragma once
 
 #define SQRT_MAX_STEPS 40
 //Lose 45% of XP when dying
@@ -44,4 +48,4 @@ const VibePattern BLUETOOTH_DISCONNECT_VIBE = {
 const VibePattern BLUETOOTH_CONNECT_VIBE = {
   .durations = (uint32_t []) {100, 85, 100},
   .num_segments = 3
-};
+};*/
