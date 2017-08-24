@@ -16,64 +16,73 @@
         "resources": {
             "media": [
                 {
-                    "file": "images/crippledAL.png",
-                    "name": "CRIPPLEDAL",
+                    "file": "images/crippledH2.png",
+                    "name": "CRIPPLED_H2",
                     "targetPlatforms": null,
-                    "type": "png-trans"
+                    "type": "bitmap"
                 },
                 {
-                    "file": "images/vault_boy.png",
-                    "name": "VAULT_BOY",
-                    "type": "png"
+                    "file": "images/crippledH1.png",
+                    "name": "CRIPPLED_H1",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/crippledLR.png",
+                    "name": "CRIPPLED_LR",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/crippledLL.png",
+                    "name": "CRIPPLED_LL",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/crippledAR.png",
+                    "name": "CRIPPLED_AR",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/crippledAL.png",
+                    "name": "CRIPPLED_AL",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/icon.png",
+                    "name": "ICON",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
                 },
                 {
                     "file": "images/pipboy_bg.png",
                     "name": "BACKGROUND",
-                    "type": "png"
+                    "targetPlatforms": null,
+                    "type": "bitmap"
                 },
                 {
-                    "file": "images/icon.png",
-                    "menuIcon": true,
-                    "name": "ICON",
-                    "type": "png"
+                    "file": "images/vault_boy.png",
+                    "name": "VAULT_BOY",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
                 },
                 {
                     "file": "images/dead.png",
                     "name": "DEAD",
-                    "type": "png"
-                },
-                {
-                    "file": "images/crippled5.png",
-                    "name": "CRIPPLED_5",
-                    "type": "png"
-                },
-                {
-                    "file": "images/crippled4.png",
-                    "name": "CRIPPLED_4",
-                    "type": "png"
-                },
-                {
-                    "file": "images/crippled3.png",
-                    "name": "CRIPPLED_3",
-                    "type": "png"
-                },
-                {
-                    "file": "images/crippled2.png",
-                    "name": "CRIPPLED_2",
-                    "type": "png"
-                },
-                {
-                    "file": "images/crippled1.png",
-                    "name": "CRIPPLED_1",
-                    "type": "png"
+                    "targetPlatforms": null,
+                    "type": "bitmap"
                 }
             ]
         },
         "sdkVersion": "3",
         "targetPlatforms": [
-            "basalt"
+            "basalt",
+            "diorite"
         ],
-        "uuid": "816e5c37-8a12-4a86-a0dc-d351b1863495",
+        "uuid": "94a19089-a7be-4efc-b852-7aaf8b8e1859",
         "watchapp": {
             "watchface": true
         }
