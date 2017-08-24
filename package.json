@@ -10,11 +10,17 @@
             "health"
         ],
         "displayName": "Pip Boy 300",
-        "enableMultiJS": false,
+        "enableMultiJS": true,
         "messageKeys": [],
         "projectType": "native",
         "resources": {
             "media": [
+                {
+                    "file": "images/crippledAL.png",
+                    "name": "CRIPPLEDAL",
+                    "targetPlatforms": null,
+                    "type": "png-trans"
+                },
                 {
                     "file": "images/vault_boy.png",
                     "name": "VAULT_BOY",
@@ -34,11 +40,6 @@
                 {
                     "file": "images/dead.png",
                     "name": "DEAD",
-                    "type": "png"
-                },
-                {
-                    "file": "images/crippledAL.png",
-                    "name": "CRIPPLED_AL",
                     "type": "png"
                 },
                 {
@@ -70,11 +71,9 @@
         },
         "sdkVersion": "3",
         "targetPlatforms": [
-            "aplite",
-            "basalt",
-            "diorite"
+            "basalt"
         ],
-        "uuid": "be4b8310-7fdb-4f84-9d93-1eb7d3d25561",
+        "uuid": "816e5c37-8a12-4a86-a0dc-d351b1863495",
         "watchapp": {
             "watchface": true
         }
