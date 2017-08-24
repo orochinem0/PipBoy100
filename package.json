@@ -2,14 +2,14 @@
     "author": "north-40",
     "dependencies": {},
     "keywords": [],
-    "name": "pip-boy-100a",
+    "name": "pip-boy-300",
     "pebble": {
         "capabilities": [
             "location",
             "configurable",
             "health"
         ],
-        "displayName": "Pip Boy 100A",
+        "displayName": "Pip Boy 300",
         "enableMultiJS": false,
         "messageKeys": [],
         "projectType": "native",
@@ -34,6 +34,11 @@
                 {
                     "file": "images/dead.png",
                     "name": "DEAD",
+                    "type": "png"
+                },
+                {
+                    "file": "images/crippledAL.png",
+                    "name": "CRIPPLED_AL",
                     "type": "png"
                 },
                 {
@@ -74,5 +79,5 @@
             "watchface": true
         }
     },
-    "version": "3.0.0"
+    "version": "2.7.0"
 }
