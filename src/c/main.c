@@ -2,55 +2,7 @@
 // Pip Boy 300 Copyright 2017 nem0 (www.nem0.net)
 
 // INCLUDES
-#include "pebble.h"
 #include "config.h"
-
-// VARIABLES
-static int s_battery_level;
-static int s_xp_level;
-static int s_next_level;
-static int s_head_level;
-static int s_headmax_level;
-
-static bool s_charging;
-static bool s_connected;
-
-static bool crippledAL = false;
-static bool crippledAR = false;
-static bool crippledLL = false;
-static bool crippledLR = false;
-static bool crippledH1 = false;
-static bool crippledH2 = false;
-static bool dead = false;
-
-static Window *s_main_window;
-
-static TextLayer *s_time_layer;
-static TextLayer *s_battery_layer;
-static TextLayer *s_date_layer;
-static TextLayer *s_xp_layer;
-static TextLayer *s_nextLvl_layer;
-static TextLayer *s_lvl_layer;
-
-static BitmapLayer *s_background_layer;
-static BitmapLayer *s_vaultBoy_layer;
-static BitmapLayer *s_crippledAL_layer;
-static BitmapLayer *s_crippledAR_layer;
-static BitmapLayer *s_crippledLL_layer;
-static BitmapLayer *s_crippledLR_layer;
-static BitmapLayer *s_crippledH1_layer;
-static BitmapLayer *s_crippledH2_layer;
-static BitmapLayer *s_dead_layer;
-
-static GBitmap *s_background_bitmap;
-static GBitmap *s_vaultBoy_bitmap;
-static GBitmap *s_crippledAL_bitmap;
-static GBitmap *s_crippledAR_bitmap;
-static GBitmap *s_crippledLL_bitmap;
-static GBitmap *s_crippledLR_bitmap;
-static GBitmap *s_crippledH1_bitmap;
-static GBitmap *s_crippledH2_bitmap;
-static GBitmap *s_dead_bitmap;
 
 // UPDATE TIME
 static void update_time() {
@@ -73,7 +25,7 @@ static void update_time() {
 	text_layer_set_text(s_date_layer, date_text);
 }
 
-// battery handler
+// BATTERY HANDLER
 static void battery_callback(BatteryChargeState state) {
   s_battery_level = state.charge_percent;
 	s_charging = state.is_charging;
@@ -122,7 +74,6 @@ static void bluetooth_update_proc() {
 // BLUETOOTH HANDLER
 static void bluetooth_callback(bool connected) {
 	s_connected = connected;
-	//layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledAR_layer));
 }
 
 // HEALTH UPDATE PROCESS
@@ -208,20 +159,79 @@ static void health_callback(HealthEventType event, void *context) {
 	}
 }
 
+// WEATHER HANDLER
+static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+	// Store incoming information
+	static char temperature_buffer[8];
+	static char conditions_buffer[32];
+	static char weather_layer_buffer[32];
+
+	// Read tuples for data
+	Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
+	Tuple *conditions_tuple = dict_find(iterator, MESSAGE_KEY_CONDITIONS);
+	
+	// If all data is available, use it
+	if(temp_tuple && conditions_tuple) {
+  	snprintf(temperature_buffer, sizeof(temperature_buffer)+1, "%d F", (int)temp_tuple->value->int32);
+  	snprintf(conditions_buffer, sizeof(conditions_buffer)+1, "%s", conditions_tuple->value->cstring);
+		
+		// Assemble full string and display
+		snprintf(weather_layer_buffer, sizeof(weather_layer_buffer)+1, "%s, %s", temperature_buffer, conditions_buffer);
+		text_layer_set_text(s_lvl_layer, weather_layer_buffer);
+	}
+}
+
+// WEATHER ERROR LOGGING : DROPPED MESSAGE
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+}
+
+// WEATHER ERROR LOGGING : OUTBOX SEND FAILURE
+static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
+}
+
+// WEATHER ERROR LOGGING : OUTBOX SEND SUCCESS
+static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+}
+
+// WEATHER LOADER
+static void weather_loader() {
+	// Register callbacks
+	app_message_register_inbox_received(inbox_received_callback);
+	app_message_register_inbox_dropped(inbox_dropped_callback);
+	app_message_register_outbox_failed(outbox_failed_callback);
+	app_message_register_outbox_sent(outbox_sent_callback);
+	
+	// Open AppMessage
+	const int inbox_size = 128;
+	const int outbox_size = 128;
+	app_message_open(inbox_size, outbox_size);	
+}
+
 // TICK HANDLER
 static void tick_handler(struct tm* tick_time, TimeUnits units_changed) {
 	update_time();
 	battery_callback(battery_state_service_peek());
 	bluetooth_callback(connection_service_peek_pebble_app_connection());
 	health_callback(health_service_peek_current_activities(), NULL);
+	// Get weather update every 30 minutes
+	if(tick_time->tm_min % 30 == 0) {
+  	// Begin dictionary
+  	DictionaryIterator *iter;
+  	app_message_outbox_begin(&iter);
+
+  	// Add a key-value pair
+  	dict_write_uint8(iter, 0, 0);
+
+  	// Send the message!
+  	app_message_outbox_send();
+	}
 }
 
-// WINDOW : LOAD
-static void main_window_load(Window *window) {
-  // Get information about the Window
-  Layer *window_layer = window_get_root_layer(window);
-  GRect frame = layer_get_bounds(window_layer);
-	
+// GRAPHICS LOADER
+static void graphics_loader(GRect frame) {
 	// Draw Background
 	s_background_bitmap = gbitmap_create_with_resource(RESOURCE_ID_BACKGROUND);
 	s_background_layer = bitmap_layer_create(frame);
@@ -256,8 +266,6 @@ static void main_window_load(Window *window) {
 	s_crippledAR_layer = bitmap_layer_create(GRect(86, 19, frame.size.w, 100));
   bitmap_layer_set_bitmap(s_crippledAR_layer, s_crippledAR_bitmap);
   bitmap_layer_set_alignment(s_crippledAR_layer, GAlignLeft);
-
-	bluetooth_update_proc();
 	
 	// Draw Crippled Leg (Left) (Less than the weekly average steps)
 	s_crippledLL_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_LL);
@@ -292,8 +300,6 @@ static void main_window_load(Window *window) {
   text_layer_set_text_alignment(s_battery_layer, GTextAlignmentRight);
 	text_layer_set_text(s_battery_layer, "BP XXX/100");
 
-	battery_update_proc();
-
 	// Create Date child layer
 	s_date_layer = text_layer_create(GRect(8, 4, frame.size.w, 34));
   text_layer_set_text_color(s_date_layer, GColorWhite);
@@ -317,10 +323,7 @@ static void main_window_load(Window *window) {
   text_layer_set_font(s_nextLvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_nextLvl_layer, GTextAlignmentLeft);
   text_layer_set_text(s_nextLvl_layer, "AS XXXXX");
-	
-	// Check steps
-	health_update_proc();
-	
+		
 	// Create Level child layer (live weather)
 	s_lvl_layer = text_layer_create(GRect(0, 121, frame.size.w, 34));
   text_layer_set_text_color(s_lvl_layer, GColorWhite);
@@ -328,8 +331,28 @@ static void main_window_load(Window *window) {
   text_layer_set_font(s_lvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_lvl_layer, GTextAlignmentCenter);
 	text_layer_set_text(s_lvl_layer, "Level 1");
+	
+}
 
-  // Add each layer as a child layer to the Window's root layer
+// WINDOW : LOAD
+static void main_window_load(Window *window) {
+	// Paint it black
+	window_set_background_color(window, GColorBlack);
+	
+  // Get information about the Window
+  Layer *window_layer = window_get_root_layer(window);
+
+	// Create window and load graphics
+  GRect frame = layer_get_bounds(window_layer);
+	graphics_loader(frame);  
+	weather_loader();
+
+	// Add dynamic data from subscriber processes
+	battery_update_proc();
+	bluetooth_update_proc();
+	health_update_proc();
+	
+  // Add base layers to the Window's root layer
 	layer_add_child(window_layer, bitmap_layer_get_layer(s_background_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_vaultBoy_layer));
 
@@ -339,18 +362,17 @@ static void main_window_load(Window *window) {
 	}
 	if (crippledAR) { // Bluetooth disconnected
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledAR_layer));
-		layer_mark_dirty(window_layer);
 	}
-	if (crippledLL) { // Step counter
+	if (crippledLL) { // Step counter (low)
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledLL_layer));
 	}
-	if (crippledLR) { // Step counter
+	if (crippledLR) { // Step counter (very low)
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledLR_layer));
 	}
-	if (crippledH1) { // Sleep counter
+	if (crippledH1) { // Sleep counter (low)
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledH1_layer));
 	}
-	if (crippledH2) { // Sleep counter
+	if (crippledH2) { // Sleep counter (very low)
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledH2_layer));
 	}
 	if (dead) { // Battery <10%
@@ -364,6 +386,7 @@ static void main_window_load(Window *window) {
 	layer_add_child(window_layer, text_layer_get_layer(s_xp_layer)); // Current steps
 	layer_add_child(window_layer, text_layer_get_layer(s_nextLvl_layer)); // Weekly step average
 	layer_add_child(window_layer, text_layer_get_layer(s_lvl_layer)); // Weather
+	layer_mark_dirty(window_layer);
 }
 
 // WINDOW : UNLOAD
@@ -401,14 +424,8 @@ static void init(void) {
 	// Create main window element and assign to pointer
   s_main_window = window_create();
 	
-	// Set handlers to manage elements within the window
-  window_set_window_handlers(s_main_window, (WindowHandlers) {.load = main_window_load,.unload = main_window_unload});
-	
-	// Subscribe to window
-	window_set_background_color(s_main_window, GColorBlack);
-	
 	// Subscribe to services
-	tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
+	tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
   battery_state_service_subscribe(battery_callback);
 	connection_service_subscribe((ConnectionHandlers) {.pebble_app_connection_handler = bluetooth_callback});
 	health_service_events_subscribe(health_callback, NULL);
@@ -418,6 +435,9 @@ static void init(void) {
 	bluetooth_callback(connection_service_peek_pebble_app_connection());
 	health_callback(health_service_peek_current_activities(), NULL);
 
+	// Set handlers to manage elements within the window
+  window_set_window_handlers(s_main_window, (WindowHandlers) {.load = main_window_load,.unload = main_window_unload});
+	
 	// Show the Window on the watch, with animated=true
   window_stack_push(s_main_window, true);
 
