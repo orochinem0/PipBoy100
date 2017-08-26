@@ -1,5 +1,5 @@
 // Pip Boy 100 Copyright 2013 Bert de Ruiter (www.bertderuiter.nl/)
-// Pip Boy 300 Copyright 2017 nem0 (www.nem0.net)
+// Pip Boy 300 Copyright 2017 nem0 (www.north40.net)
 
 // INCLUDES
 #include "config.h"
@@ -239,7 +239,7 @@ static void tick_handler(struct tm* tick_time, TimeUnits units_changed) {
 	}
 }
 
-// DRAW BARS
+// DRAW BARS : GENERIC WRAPPER
 static void draw_bar(int width, int current, int upper, Layer *layer, GContext *ctx){
 	GRect bounds = layer_get_bounds(layer);
 
@@ -258,18 +258,16 @@ static void draw_bar(int width, int current, int upper, Layer *layer, GContext *
   graphics_fill_rect(ctx, GRect(2, 2, width, bounds.size.h), 0, GCornerNone);
 }
 
+// DRAW INDIVIDUAL BARS
 static void draw_batterybar(Layer *layer, GContext *ctx){
 	draw_bar(c_bar_width,s_battery_level,100,layer,ctx);
 }
-
 static void draw_sleepbar(Layer *layer, GContext *ctx){
 	draw_bar(c_bar_width,s_head_level,s_headmax_level,layer,ctx);
 }
-
 static void draw_stepsbar1(Layer *layer, GContext *ctx){
 	draw_bar(c_bar_width,s_xp_level,(s_next_level*2),layer,ctx);
 }
-
 static void draw_stepsbar2(Layer *layer, GContext *ctx){
 	draw_bar(c_bar_width,s_xp_level,s_next_level,layer,ctx);
 }
@@ -420,34 +418,51 @@ static void main_window_load(Window *window) {
 	
 	// Add modifier layers
 	if (crippledAL) { // Battery <30%
-		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledAL_layer));
+		if (!s_charging) {
+			layer_set_hidden(s_batterybar_layer,true);
+			layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledAL_layer));
+		}
 	}
 	else {
-		layer_set_update_proc(s_batterybar_layer, draw_batterybar);
-		layer_mark_dirty(s_batterybar_layer);
+		if (!s_charging){
+			layer_set_hidden(s_batterybar_layer,false);
+			layer_set_update_proc(s_batterybar_layer, draw_batterybar);
+			layer_mark_dirty(s_batterybar_layer);
+		}
 	}
 	if (crippledAR) { // Bluetooth disconnected
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledAR_layer));
 	}
 	if (crippledLL) { // Step counter (low)
+		layer_set_hidden(s_stepsbar1_layer,true);
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledLL_layer));
 	}
 	else {
+		layer_set_hidden(s_stepsbar1_layer,false);
 		layer_set_update_proc(s_stepsbar1_layer, draw_stepsbar1);
 		layer_mark_dirty(s_stepsbar1_layer);
 	}
 	if (crippledLR) { // Step counter (very low)
+		layer_set_hidden(s_stepsbar2_layer,true);
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledLR_layer));
 	}
 	else {
+		layer_set_hidden(s_stepsbar2_layer,false);
 		layer_set_update_proc(s_stepsbar2_layer, draw_stepsbar2);
 		layer_mark_dirty(s_stepsbar2_layer);
 	}
 	if (crippledH1) { // Sleep counter (low)
+		layer_set_hidden(s_sleepbar_layer,true);
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledH1_layer));
 	}
-	if (crippledH2) { // Sleep counter (very low)
+	else if (crippledH2) { // Sleep counter (very low)
+		layer_set_hidden(s_sleepbar_layer,true);
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledH2_layer));
+	}
+	else {
+			layer_set_hidden(s_sleepbar_layer,false);
+			layer_set_update_proc(s_sleepbar_layer, draw_sleepbar);
+			layer_mark_dirty(s_sleepbar_layer);		
 	}
 	if (dead) { // Battery <10%
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_dead_layer));
@@ -462,15 +477,6 @@ static void main_window_load(Window *window) {
 	layer_add_child(window_layer, text_layer_get_layer(s_lvl_layer)); // Weather
 	layer_add_child(window_layer, text_layer_get_layer(s_heart_layer)); // Heart rate
 
-	layer_set_update_proc(s_batterybar_layer, draw_batterybar);
-	layer_set_update_proc(s_sleepbar_layer, draw_sleepbar);
-	layer_set_update_proc(s_stepsbar1_layer, draw_stepsbar1);
-	layer_set_update_proc(s_stepsbar2_layer, draw_stepsbar2);
-	
-	layer_mark_dirty(s_batterybar_layer);
-	layer_mark_dirty(s_sleepbar_layer);
-	layer_mark_dirty(s_stepsbar1_layer);
-	layer_mark_dirty(s_stepsbar2_layer);
 	layer_mark_dirty(window_layer);
 }
 

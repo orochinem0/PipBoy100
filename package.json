@@ -19,6 +19,12 @@
         "resources": {
             "media": [
                 {
+                    "file": "images/battery.png",
+                    "name": "BATTERY",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
                     "file": "images/crippledH2.png",
                     "name": "CRIPPLED_H2",
                     "targetPlatforms": null,
