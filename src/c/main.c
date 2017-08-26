@@ -1,5 +1,5 @@
 // Pip Boy 100 Copyright 2013 Bert de Ruiter (www.bertderuiter.nl/)
-// Pip Boy 300 Copyright 2017 nem0 (www.north40.net)
+// Pip Boy 300 Copyright 2017 nem0 (www.north-40.net)
 
 // INCLUDES
 #include "config.h"
