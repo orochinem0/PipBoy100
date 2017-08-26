@@ -39,11 +39,11 @@ static void battery_update_proc() {
 		text_layer_set_text(s_battery_layer, s_buffer);
 	}
 	else {
-		snprintf(s_buffer, sizeof(s_buffer)+1, "%s %d %s", "BP",s_battery_level, "/100");
+		snprintf(s_buffer, sizeof(s_buffer)+1, "BP %d/100", s_battery_level);
 		text_layer_set_text(s_battery_layer, s_buffer);
 	}
 	
-	// Cripple arm
+	// Cripple arm @ 30%
 	if (s_battery_level <= 30) {
 		crippledAL = true;
 	}
@@ -51,7 +51,7 @@ static void battery_update_proc() {
 		crippledAL = false;
 	}
 	
-	// Kill Vault Boy
+	// Kill Vault Boy @ 10%
 	if (s_battery_level <= 10) {
 		dead = true;
 	}
@@ -80,11 +80,14 @@ static void bluetooth_callback(bool connected) {
 static void health_update_proc() {
 	static char s_bufferX[] = "ST  00000";
 	static char s_bufferN[] = "AS 00000";
+	static char s_bufferH[] = "000";
 
-	snprintf(s_bufferX, sizeof(s_bufferX)+1, "%s %d", "ST  ",s_xp_level);
-	snprintf(s_bufferN, sizeof(s_bufferN)+1, "%s %d", "AS ",s_next_level);
+	snprintf(s_bufferX, sizeof(s_bufferX)+1, "ST  %d",s_xp_level);
+	snprintf(s_bufferN, sizeof(s_bufferN)+1, "AS %d",s_next_level);
+	snprintf(s_bufferH, sizeof(s_bufferH)+1, "%d",s_heart_level);
 	text_layer_set_text(s_xp_layer, s_bufferX);
 	text_layer_set_text(s_nextLvl_layer, s_bufferN);
+	text_layer_set_text(s_heart_layer, s_bufferH);
 	
 	// If steps total is lower than 7 day average, cripple one leg
 	if (s_xp_level < s_next_level) {
@@ -127,11 +130,6 @@ static void health_callback(HealthEventType event, void *context) {
 	time_t end = time(NULL);
 	time_t week = time_start_of_today() - (7 * SECONDS_PER_DAY);
 	
-	s_xp_level = 0;
-	s_next_level = 0;
-	s_head_level = 0;
-	s_headmax_level = 0;
-
 	// Check the metric has step data available for today
 	HealthServiceAccessibilityMask mask = health_service_metric_accessible(step_metric, start, end);
 
@@ -157,9 +155,20 @@ static void health_callback(HealthEventType event, void *context) {
   	// No data recorded yet today
   	APP_LOG(APP_LOG_LEVEL_ERROR, "Sleep data unavailable!");
 	}
+	
+	HealthServiceAccessibilityMask hr = health_service_metric_accessible(HealthMetricHeartRateBPM, time(NULL), time(NULL));
+	if (hr & HealthServiceAccessibilityMaskAvailable) {
+	  HealthValue val = health_service_peek_current_value(HealthMetricHeartRateBPM);
+	  if(val > 0) {
+	    s_heart_level = val;
+	  }
+		else {
+			APP_LOG(APP_LOG_LEVEL_ERROR, "Heart rate data unavailable!");
+		}
+	}
 }
 
-// WEATHER HANDLER
+// JAVA HANDLER : WEATHER
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
 	// Store incoming information
 	static char temperature_buffer[8];
@@ -181,17 +190,17 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	}
 }
 
-// WEATHER ERROR LOGGING : DROPPED MESSAGE
+// JAVA ERROR LOGGING : DROPPED MESSAGE
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
 }
 
-// WEATHER ERROR LOGGING : OUTBOX SEND FAILURE
+// JAVA ERROR LOGGING : OUTBOX SEND FAILURE
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
 }
 
-// WEATHER ERROR LOGGING : OUTBOX SEND SUCCESS
+// JAVA ERROR LOGGING : OUTBOX SEND SUCCESS
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
 }
@@ -228,6 +237,41 @@ static void tick_handler(struct tm* tick_time, TimeUnits units_changed) {
   	// Send the message!
   	app_message_outbox_send();
 	}
+}
+
+// DRAW BARS
+static void draw_bar(int width, int current, int upper, Layer *layer, GContext *ctx){
+	GRect bounds = layer_get_bounds(layer);
+
+	if (current < upper) {
+	  width = (current * width) / upper;
+	}
+
+  // Draw the background
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, GRect(1, 1, bounds.size.w, bounds.size.h), 0, GCornerNone);
+
+  // Draw the bar
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, GRect(2, 2, width, bounds.size.h), 0, GCornerNone);
+}
+
+static void draw_batterybar(Layer *layer, GContext *ctx){
+	draw_bar(c_bar_width,s_battery_level,100,layer,ctx);
+}
+
+static void draw_sleepbar(Layer *layer, GContext *ctx){
+	draw_bar(c_bar_width,s_head_level,s_headmax_level,layer,ctx);
+}
+
+static void draw_stepsbar1(Layer *layer, GContext *ctx){
+	draw_bar(c_bar_width,s_xp_level,(s_next_level*2),layer,ctx);
+}
+
+static void draw_stepsbar2(Layer *layer, GContext *ctx){
+	draw_bar(c_bar_width,s_xp_level,s_next_level,layer,ctx);
 }
 
 // GRAPHICS LOADER
@@ -332,6 +376,19 @@ static void graphics_loader(GRect frame) {
   text_layer_set_text_alignment(s_lvl_layer, GTextAlignmentCenter);
 	text_layer_set_text(s_lvl_layer, "Level 1");
 	
+	// Create Heart child layer
+	s_heart_layer = text_layer_create(GRect(0, 64, frame.size.w, 34));
+  text_layer_set_text_color(s_heart_layer, GColorWhite);
+  text_layer_set_background_color(s_heart_layer, GColorClear);
+  text_layer_set_font(s_heart_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_heart_layer, GTextAlignmentCenter);
+	text_layer_set_text(s_heart_layer, "000");
+	
+	// Create bar layers
+	s_batterybar_layer = layer_create(GRect(24, 54, 25, 5));
+	s_sleepbar_layer = layer_create(GRect(63, 29, 25, 5));
+	s_stepsbar1_layer = layer_create(GRect(28, 96, 25, 5));
+	s_stepsbar2_layer = layer_create(GRect(94, 96, 25, 5));
 }
 
 // WINDOW : LOAD
@@ -356,9 +413,18 @@ static void main_window_load(Window *window) {
 	layer_add_child(window_layer, bitmap_layer_get_layer(s_background_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_vaultBoy_layer));
 
+	layer_add_child(window_get_root_layer(window), s_batterybar_layer);
+	layer_add_child(window_get_root_layer(window), s_sleepbar_layer);
+	layer_add_child(window_get_root_layer(window), s_stepsbar1_layer);
+	layer_add_child(window_get_root_layer(window), s_stepsbar2_layer);
+	
 	// Add modifier layers
 	if (crippledAL) { // Battery <30%
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledAL_layer));
+	}
+	else {
+		layer_set_update_proc(s_batterybar_layer, draw_batterybar);
+		layer_mark_dirty(s_batterybar_layer);
 	}
 	if (crippledAR) { // Bluetooth disconnected
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledAR_layer));
@@ -366,8 +432,16 @@ static void main_window_load(Window *window) {
 	if (crippledLL) { // Step counter (low)
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledLL_layer));
 	}
+	else {
+		layer_set_update_proc(s_stepsbar1_layer, draw_stepsbar1);
+		layer_mark_dirty(s_stepsbar1_layer);
+	}
 	if (crippledLR) { // Step counter (very low)
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledLR_layer));
+	}
+	else {
+		layer_set_update_proc(s_stepsbar2_layer, draw_stepsbar2);
+		layer_mark_dirty(s_stepsbar2_layer);
 	}
 	if (crippledH1) { // Sleep counter (low)
 		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledH1_layer));
@@ -386,6 +460,17 @@ static void main_window_load(Window *window) {
 	layer_add_child(window_layer, text_layer_get_layer(s_xp_layer)); // Current steps
 	layer_add_child(window_layer, text_layer_get_layer(s_nextLvl_layer)); // Weekly step average
 	layer_add_child(window_layer, text_layer_get_layer(s_lvl_layer)); // Weather
+	layer_add_child(window_layer, text_layer_get_layer(s_heart_layer)); // Heart rate
+
+	layer_set_update_proc(s_batterybar_layer, draw_batterybar);
+	layer_set_update_proc(s_sleepbar_layer, draw_sleepbar);
+	layer_set_update_proc(s_stepsbar1_layer, draw_stepsbar1);
+	layer_set_update_proc(s_stepsbar2_layer, draw_stepsbar2);
+	
+	layer_mark_dirty(s_batterybar_layer);
+	layer_mark_dirty(s_sleepbar_layer);
+	layer_mark_dirty(s_stepsbar1_layer);
+	layer_mark_dirty(s_stepsbar2_layer);
 	layer_mark_dirty(window_layer);
 }
 
@@ -417,12 +502,22 @@ static void main_window_unload(Window *window) {
 	text_layer_destroy(s_xp_layer);
 	text_layer_destroy(s_nextLvl_layer);
 	text_layer_destroy(s_lvl_layer);
+	text_layer_destroy(s_heart_layer);
+	
+	layer_destroy(s_batterybar_layer);
+	layer_destroy(s_sleepbar_layer);
+	layer_destroy(s_stepsbar1_layer);
+	layer_destroy(s_stepsbar2_layer);
 }
 
 // INITIALIZE
 static void init(void) {
-	// Create main window element and assign to pointer
-  s_main_window = window_create();
+	// Init stat variables
+	s_xp_level = 0;
+	s_next_level = 0;
+	s_head_level = 0;
+	s_headmax_level = 0;
+	s_heart_level = 0;
 	
 	// Subscribe to services
 	tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
@@ -435,6 +530,9 @@ static void init(void) {
 	bluetooth_callback(connection_service_peek_pebble_app_connection());
 	health_callback(health_service_peek_current_activities(), NULL);
 
+	// Create main window element and assign to pointer
+  s_main_window = window_create();
+	
 	// Set handlers to manage elements within the window
   window_set_window_handlers(s_main_window, (WindowHandlers) {.load = main_window_load,.unload = main_window_unload});
 	
