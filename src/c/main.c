@@ -4,6 +4,29 @@
 // INCLUDES
 #include "config.h"
 
+ClaySettings settings;
+
+// DEFAULT SETTINGS
+static void config_default_settings() {
+  settings.steps_type = 0; // 0 = past day, 1 = avg of today's weekday, 2 = avg past week, 3  = avg past month, 4 = manual
+  settings.sleep_type = 1; // 0 = past day, 1 = avg of today's weekday, 2 = avg past week, 3 = avg past month, 4 = manual
+  settings.steps_count = 8000;
+  settings.sleep_count = 8 * SECONDS_PER_HOUR;
+	settings.crippled_status = 1;
+}
+
+// SAVE PERSISTENT SETTINGS
+static void config_save_settings() {
+  persist_write_data(SETTINGS_KEY, &settings, sizeof(settings));
+}
+
+// READ PERSISTENT SETTINGS
+static void config_load_settings() {
+  config_default_settings();
+	config_save_settings();
+  persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
+}
+
 // UPDATE TIME
 static void update_time() {
   // Get a tm structure
@@ -13,16 +36,36 @@ static void update_time() {
   // Write the current hours and minutes into a buffer
   static char s_buffer[8];
   strftime(s_buffer, sizeof(s_buffer), clock_is_24h_style() ? "%H:%M" : "%I:%M", tick_time);
-
-  // Display this time on the TextLayer
   text_layer_set_text(s_time_layer, s_buffer);
 	
 	// Write current date to buffer
 	static char date_text[20];
 	strftime(date_text, sizeof(date_text), "%m-%d-%Y", tick_time);
-	
-	// Display date
 	text_layer_set_text(s_date_layer, date_text);
+}
+
+// BATTERY UPDATE PROCESS
+static void battery_update_proc() {
+	static char s_buffer[] = "BP XXX/100";
+	
+	if (s_charging) {
+		snprintf(s_buffer, sizeof(s_buffer)+1, "%s", " CHARGING ");
+	}
+	else {
+		snprintf(s_buffer, sizeof(s_buffer)+1, "BP %d/100", s_battery_level);
+	}
+	
+	text_layer_set_text(s_battery_layer, s_buffer);
+	layer_set_hidden(s_batterybar_layer,(s_battery_level < 30));
+	layer_set_hidden(bitmap_layer_get_layer(s_crippledAL_bitlayer),true);
+	layer_set_hidden(bitmap_layer_get_layer(s_dead_bitlayer),true);
+
+	// Cripple arm @ 30%
+	if (settings.crippled_status) {
+		layer_set_hidden(bitmap_layer_get_layer(s_dead_bitlayer),(s_battery_level >= 30));
+	}
+	// Kill Vault Boy @ 10%
+	layer_set_hidden(bitmap_layer_get_layer(s_dead_bitlayer),(s_battery_level > 10));
 }
 
 // BATTERY HANDLER
@@ -31,44 +74,13 @@ static void battery_callback(BatteryChargeState state) {
 	s_charging = state.is_charging;
 }
 
-// BATTERY UPDATE PROCESS
-static void battery_update_proc() {
-	static char s_buffer[] = "BP XXX/100";
-	if (s_charging) {
-		snprintf(s_buffer, sizeof(s_buffer)+1, "%s", " CHARGING ");
-		text_layer_set_text(s_battery_layer, s_buffer);
-	}
-	else {
-		snprintf(s_buffer, sizeof(s_buffer)+1, "BP %d/100", s_battery_level);
-		text_layer_set_text(s_battery_layer, s_buffer);
-	}
-	
-	// Cripple arm @ 30%
-	if (s_battery_level <= 30) {
-		crippledAL = true;
-	}
-	else {
-		crippledAL = false;
-	}
-	
-	// Kill Vault Boy @ 10%
-	if (s_battery_level <= 10) {
-		dead = true;
-	}
-	else {
-		dead = false;
-	}
-}
-
 // BLUETOOTH UPDATE PROCESS
 static void bluetooth_update_proc() {
   if(!s_connected) {
-		crippledAR = true;
 		vibes_double_pulse();
 	}
-	else {
-		crippledAR = false;
-  }	
+	layer_set_hidden(bitmap_layer_get_layer(s_crippledAR_bitlayer),s_connected);
+	layer_set_hidden(bitmap_layer_get_layer(s_bluetooth_bitlayer),!s_connected);
 }
 
 // BLUETOOTH HANDLER
@@ -79,46 +91,31 @@ static void bluetooth_callback(bool connected) {
 // HEALTH UPDATE PROCESS
 static void health_update_proc() {
 	static char s_bufferX[] = "ST  00000";
-	static char s_bufferN[] = "AS 00000";
+	static char s_bufferN[] = "SG 00000";
 	static char s_bufferH[] = "000";
 
 	snprintf(s_bufferX, sizeof(s_bufferX)+1, "ST  %d",s_xp_level);
-	snprintf(s_bufferN, sizeof(s_bufferN)+1, "AS %d",s_next_level);
+	snprintf(s_bufferN, sizeof(s_bufferN)+1, "SG %d",s_next_level);
 	snprintf(s_bufferH, sizeof(s_bufferH)+1, "%d",s_heart_level);
+	
 	text_layer_set_text(s_xp_layer, s_bufferX);
 	text_layer_set_text(s_nextLvl_layer, s_bufferN);
 	text_layer_set_text(s_heart_layer, s_bufferH);
 	
-	// If steps total is lower than 7 day average, cripple one leg
-	if (s_xp_level < s_next_level) {
-		crippledLL = true;
-	}
-	else {
-		crippledLL = false;		
-	}
+	layer_set_hidden(s_stepsbar1_layer,false);
+	layer_set_hidden(s_stepsbar2_layer,false);
+	layer_set_hidden(bitmap_layer_get_layer(s_crippledLL_bitlayer),true);
+	layer_set_hidden(bitmap_layer_get_layer(s_crippledLR_bitlayer),true);
+	layer_set_hidden(bitmap_layer_get_layer(s_crippledH1_bitlayer),true);
+	layer_set_hidden(bitmap_layer_get_layer(s_crippledH2_bitlayer),true);
 	
-	// If steps total is less than half that of the 7 day average, cripple the other leg
-	if ((s_xp_level*2) < s_next_level) {
-		crippledLR = true;
-	}
-	else {
-		crippledLR = false;		
-	}	
-
-	// If sleep total is lower than 7 day average, injure the head
-	if (s_head_level < s_headmax_level) {
-		crippledH1 = true;
-	}
-	else {
-		crippledH1 = false;		
-	}
-	
-	// If sleep total is less than half that of the 7 day average, cripple the head
-	if ((s_head_level*2) < s_headmax_level) {
-		crippledH2 = true;
-	}
-	else {
-		crippledH2 = false;		
+	if (settings.crippled_status) {
+		layer_set_hidden(s_stepsbar1_layer,(s_xp_level < s_next_level));
+		layer_set_hidden(s_stepsbar2_layer,((s_xp_level*2) < s_next_level));
+		layer_set_hidden(bitmap_layer_get_layer(s_crippledLL_bitlayer),(s_xp_level > s_next_level));
+		layer_set_hidden(bitmap_layer_get_layer(s_crippledLR_bitlayer),((s_xp_level*2) > s_next_level));
+		layer_set_hidden(bitmap_layer_get_layer(s_crippledH1_bitlayer),(s_head_level > s_headmax_level));
+		layer_set_hidden(bitmap_layer_get_layer(s_crippledH2_bitlayer),((s_head_level*0.8) > s_headmax_level));
 	}
 }
 
@@ -126,38 +123,77 @@ static void health_update_proc() {
 static void health_callback(HealthEventType event, void *context) {	
 	HealthMetric step_metric = HealthMetricStepCount;
 	HealthMetric sleep_metric = HealthMetricSleepSeconds;
-	time_t start = time_start_of_today();
-	time_t end = time(NULL);
-	time_t week = time_start_of_today() - (7 * SECONDS_PER_DAY);
+	HealthServiceAccessibilityMask mask;
+	HealthServiceTimeScope scope = HealthServiceTimeScopeOnce;
 	
-	// Check the metric has step data available for today
-	HealthServiceAccessibilityMask mask = health_service_metric_accessible(step_metric, start, end);
-
-	if(mask & HealthServiceAccessibilityMaskAvailable) {
-  	// Data is available!
-		s_xp_level = (int)health_service_sum_today(step_metric);
-		s_next_level = (int)health_service_aggregate_averaged(step_metric, week, end, HealthAggregationSum, HealthServiceTimeScopeDaily);
-	} 
-	else {
-  	// No data recorded yet today
-  	APP_LOG(APP_LOG_LEVEL_ERROR, "Step data unavailable!");
-	}
-
-	// Check the metric has data available for today
-	mask = health_service_metric_accessible(sleep_metric, start, end);
-
-	if(mask & HealthServiceAccessibilityMaskAvailable) {
-  	// Data is available!
-		s_head_level = (int)health_service_sum_today(sleep_metric);
-		s_headmax_level = (int)health_service_aggregate_averaged(sleep_metric, week, end, HealthAggregationSum, HealthServiceTimeScopeDaily);
-	} 
-	else {
-  	// No data recorded yet today
-  	APP_LOG(APP_LOG_LEVEL_ERROR, "Sleep data unavailable!");
+	time_t now = time(NULL);
+	time_t today = time_start_of_today();
+	time_t day = today - SECONDS_PER_DAY;
+	time_t week = today - (7 * SECONDS_PER_DAY);
+	time_t month = today - (30 * SECONDS_PER_DAY);
+	time_t start = today;
+	
+	s_xp_level = (int)health_service_sum_today(step_metric);
+	s_next_level = settings.steps_count;
+	
+	switch (settings.steps_type) {
+		case 0 :	start = day;
+							scope = HealthServiceTimeScopeOnce;
+		break;
+		case 1 :	start = day;
+							scope = HealthServiceTimeScopeWeekly;
+		break;
+		case 2 :	start = week;
+							scope = HealthServiceTimeScopeDaily;
+		break;
+		case 3 :	start = month;
+							scope = HealthServiceTimeScopeDaily;
+		break;
 	}
 	
-	HealthServiceAccessibilityMask hr = health_service_metric_accessible(HealthMetricHeartRateBPM, time(NULL), time(NULL));
-	if (hr & HealthServiceAccessibilityMaskAvailable) {
+	if (settings.steps_type != 4) {
+		mask = health_service_metric_accessible(step_metric, start, today);
+		if(mask & HealthServiceAccessibilityMaskAvailable) {
+			s_next_level = (int)health_service_aggregate_averaged(step_metric, start, today, HealthAggregationSum, scope);
+		}
+		else {
+ 			APP_LOG(APP_LOG_LEVEL_ERROR, "Step data unavailable!");
+		}
+	}
+	
+	s_head_level = (int)health_service_sum_today(sleep_metric);
+	s_headmax_level = settings.sleep_count;
+
+	switch (settings.sleep_type) {
+		case 0 :	start = day;
+							scope = HealthServiceTimeScopeOnce;
+		break;
+		case 1 :	start = day;
+							scope = HealthServiceTimeScopeWeekly;
+		break;
+		case 2 :	start = week;
+							scope = HealthServiceTimeScopeDaily;
+		break;
+		case 3 :	start = month;
+							scope = HealthServiceTimeScopeDaily;
+		break;
+	}	
+	
+	if (settings.sleep_type != 4) {
+		mask = health_service_metric_accessible(sleep_metric, start, today);
+		if(mask & HealthServiceAccessibilityMaskAvailable) {
+			s_head_level = (int)health_service_sum_today(sleep_metric);
+			s_headmax_level = (int)health_service_aggregate_averaged(sleep_metric, start, today, HealthAggregationSum, scope);
+		}
+		else {
+  		// No data recorded yet today
+  		APP_LOG(APP_LOG_LEVEL_ERROR, "Sleep data unavailable!");
+		}
+	}
+	
+	// Get heart rate
+	mask = health_service_metric_accessible(HealthMetricHeartRateBPM, now, now);
+	if (mask & HealthServiceAccessibilityMaskAvailable) {
 	  HealthValue val = health_service_peek_current_value(HealthMetricHeartRateBPM);
 	  if(val > 0) {
 	    s_heart_level = val;
@@ -165,28 +201,6 @@ static void health_callback(HealthEventType event, void *context) {
 		else {
 			APP_LOG(APP_LOG_LEVEL_ERROR, "Heart rate data unavailable!");
 		}
-	}
-}
-
-// JAVA HANDLER : WEATHER
-static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
-	// Store incoming information
-	static char temperature_buffer[8];
-	static char conditions_buffer[32];
-	static char weather_layer_buffer[32];
-
-	// Read tuples for data
-	Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
-	Tuple *conditions_tuple = dict_find(iterator, MESSAGE_KEY_CONDITIONS);
-	
-	// If all data is available, use it
-	if(temp_tuple && conditions_tuple) {
-  	snprintf(temperature_buffer, sizeof(temperature_buffer)+1, "%d F", (int)temp_tuple->value->int32);
-  	snprintf(conditions_buffer, sizeof(conditions_buffer)+1, "%s", conditions_tuple->value->cstring);
-		
-		// Assemble full string and display
-		snprintf(weather_layer_buffer, sizeof(weather_layer_buffer)+1, "%s, %s", temperature_buffer, conditions_buffer);
-		text_layer_set_text(s_lvl_layer, weather_layer_buffer);
 	}
 }
 
@@ -205,10 +219,81 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
 }
 
-// WEATHER LOADER
-static void weather_loader() {
+// JAVA OUTBOX SENT HANDLER
+static void outbox_sent_handler(DictionaryIterator *iter, void *context) {
+	/*Tuplet call_type[] = {
+	  TupletCString(JS_CALL_TYPE, "Weather"),
+	};
+	
+	uint8_t buffer[256];
+	uint32_t size = sizeof(buffer);
+	dict_serialize_tuplets_to_buffer(call_type, ARRAY_LENGTH(call_type), buffer, &size);
+	
+	int value = 3;
+	
+  if(app_message_outbox_begin(&iter) == APP_MSG_OK) {
+    dict_write_int(iter, MESSAGE_KEY_JS_CALL_TYPE, &value, sizeof(int), true);
+    app_message_outbox_send();
+  }
+
+  APP_LOG(APP_LOG_LEVEL_INFO, "All transmission complete!");*/
+}
+
+// JAVA INBOX HANDLER
+static void inbox_received_handler(DictionaryIterator *iterator, void *context) {
+	// Read tuples for data
+	Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
+	Tuple *conditions_tuple = dict_find(iterator, MESSAGE_KEY_CONDITIONS);
+	
+	Tuple *t_MANUAL_STEPS = dict_find(iterator, MESSAGE_KEY_MANUAL_STEPS);
+	Tuple *t_MANUAL_SLEEP = dict_find(iterator, MESSAGE_KEY_MANUAL_SLEEP);
+ 	Tuple *t_STEPS_TYPE = dict_find(iterator, MESSAGE_KEY_STEPS_TYPE);
+ 	Tuple *t_SLEEP_TYPE = dict_find(iterator, MESSAGE_KEY_SLEEP_TYPE);
+	Tuple *t_CRIPPLED_STATUS = dict_find(iterator, MESSAGE_KEY_CRIPPLED_STATUS);
+	
+	// If there's weather data, process it
+	if(temp_tuple && conditions_tuple) {
+		static char temperature_buffer[8];
+		static char conditions_buffer[32];
+		static char weather_layer_buffer[32];
+
+  	snprintf(temperature_buffer, sizeof(temperature_buffer)+1, "%d F", (int)temp_tuple->value->int32);
+  	snprintf(conditions_buffer, sizeof(conditions_buffer)+1, "%s", conditions_tuple->value->cstring);
+		
+		// Assemble full string and display
+		snprintf(weather_layer_buffer, sizeof(weather_layer_buffer)+1, "%s, %s", temperature_buffer, conditions_buffer);
+		text_layer_set_text(s_lvl_layer, weather_layer_buffer);
+	}
+			
+	// If there's config data, use it
+	if (t_CRIPPLED_STATUS){
+		settings.crippled_status = (int)t_CRIPPLED_STATUS->value->int32;
+		APP_LOG(APP_LOG_LEVEL_INFO, "Read anxiety state: %d", (int)t_CRIPPLED_STATUS->value->int32);
+	}
+	if (t_STEPS_TYPE) {
+		settings.steps_type = (int)t_STEPS_TYPE->value->int32;
+		APP_LOG(APP_LOG_LEVEL_INFO, "Read steps type: %d", (int)t_STEPS_TYPE->value->int32);
+	}
+	if (t_MANUAL_STEPS) {
+		//settings.steps_count = (int)t_MANUAL_STEPS->value->int32;
+		APP_LOG(APP_LOG_LEVEL_INFO, "Read manual steps count: %d", (int)t_MANUAL_STEPS->value->cstring);
+	} 
+	if (t_SLEEP_TYPE) {
+		//settings.sleep_type = (int)t_SLEEP_TYPE->value->int32;
+		APP_LOG(APP_LOG_LEVEL_INFO, "Read sleep type: %d", (int)t_SLEEP_TYPE->value->int32);
+	}
+	if (t_MANUAL_SLEEP) {
+		settings.sleep_count = (int)t_MANUAL_SLEEP->value->int32;
+		APP_LOG(APP_LOG_LEVEL_INFO, "Read manual sleep hours: %d", (int)t_MANUAL_SLEEP->value->int32);
+	}
+	
+	config_save_settings();
+}
+
+// JAVA INBOX LOADER
+static void inbox_loader() {
 	// Register callbacks
-	app_message_register_inbox_received(inbox_received_callback);
+	app_message_register_inbox_received(inbox_received_handler);
 	app_message_register_inbox_dropped(inbox_dropped_callback);
 	app_message_register_outbox_failed(outbox_failed_callback);
 	app_message_register_outbox_sent(outbox_sent_callback);
@@ -216,26 +301,45 @@ static void weather_loader() {
 	// Open AppMessage
 	const int inbox_size = 128;
 	const int outbox_size = 128;
-	app_message_open(inbox_size, outbox_size);	
+	app_message_open(inbox_size, outbox_size);
+}
+
+// JAVA INBOX UPDATER
+static void inbox_updater() {
+  DictionaryIterator *iter;
+ 	app_message_outbox_begin(&iter);
+  dict_write_uint8(iter, 0, 0);
+  app_message_outbox_send();
 }
 
 // TICK HANDLER
 static void tick_handler(struct tm* tick_time, TimeUnits units_changed) {
-	update_time();
-	battery_callback(battery_state_service_peek());
-	bluetooth_callback(connection_service_peek_pebble_app_connection());
-	health_callback(health_service_peek_current_activities(), NULL);
-	// Get weather update every 30 minutes
+	bool charge_state_change = s_battery_charge_state.is_charging;
+	bool connection_state_change = s_connected;
+
+	// Update once per minute
+	if(tick_time->tm_sec == 0) {
+    update_time();
+		health_callback(health_service_peek_current_activities(), NULL);
+  }
+		
+	// Update on change
+	s_battery_charge_state = battery_state_service_peek();
+	if (charge_state_change != s_battery_charge_state.is_charging) {
+		APP_LOG(APP_LOG_LEVEL_INFO, "battery state change");
+		battery_update_proc();
+	}
+	
+	// Update on change, allegedly
+	s_connected = connection_service_peek_pebble_app_connection();	
+	if (connection_state_change != s_connected) {
+		APP_LOG(APP_LOG_LEVEL_INFO, "connection state change");
+		bluetooth_update_proc();
+	}
+	
+	// Update every 30 minutes
 	if(tick_time->tm_min % 30 == 0) {
-  	// Begin dictionary
-  	DictionaryIterator *iter;
-  	app_message_outbox_begin(&iter);
-
-  	// Add a key-value pair
-  	dict_write_uint8(iter, 0, 0);
-
-  	// Send the message!
-  	app_message_outbox_send();
+ 		inbox_updater();
 	}
 }
 
@@ -266,66 +370,72 @@ static void draw_sleepbar(Layer *layer, GContext *ctx){
 	draw_bar(c_bar_width,s_head_level,s_headmax_level,layer,ctx);
 }
 static void draw_stepsbar1(Layer *layer, GContext *ctx){
-	draw_bar(c_bar_width,s_xp_level,(s_next_level*2),layer,ctx);
+	draw_bar(c_bar_width,s_xp_level,s_next_level,layer,ctx);
 }
 static void draw_stepsbar2(Layer *layer, GContext *ctx){
-	draw_bar(c_bar_width,s_xp_level,s_next_level,layer,ctx);
+	draw_bar(c_bar_width,s_xp_level,s_next_level/2,layer,ctx);
 }
 
 // GRAPHICS LOADER
 static void graphics_loader(GRect frame) {
 	// Draw Background
 	s_background_bitmap = gbitmap_create_with_resource(RESOURCE_ID_BACKGROUND);
-	s_background_layer = bitmap_layer_create(frame);
-	bitmap_layer_set_bitmap(s_background_layer, s_background_bitmap);
+	s_background_bitlayer = bitmap_layer_create(frame);
+	bitmap_layer_set_bitmap(s_background_bitlayer, s_background_bitmap);
 	
 	// Draw Vault Boy
 	s_vaultBoy_bitmap = gbitmap_create_with_resource(RESOURCE_ID_VAULT_BOY);
-	s_vaultBoy_layer = bitmap_layer_create(GRect(3, 26, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_vaultBoy_layer, s_vaultBoy_bitmap);
-  bitmap_layer_set_alignment(s_vaultBoy_layer, GAlignCenter);
+	s_vaultBoy_bitlayer = bitmap_layer_create(GRect(3, 26, frame.size.w, 100));
+  bitmap_layer_set_bitmap(s_vaultBoy_bitlayer, s_vaultBoy_bitmap);
+  bitmap_layer_set_alignment(s_vaultBoy_bitlayer, GAlignCenter);
 	
 	// Draw Vault Boy's Damaged Head (Under par sleep)
 	s_crippledH1_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_H1);
-	s_crippledH1_layer = bitmap_layer_create(GRect(3, -4, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledH1_layer, s_crippledH1_bitmap);
-  bitmap_layer_set_alignment(s_crippledH1_layer, GAlignCenter);
+	s_crippledH1_bitlayer = bitmap_layer_create(GRect(3, 1, frame.size.w, 100));
+  bitmap_layer_set_bitmap(s_crippledH1_bitlayer, s_crippledH1_bitmap);
+  bitmap_layer_set_alignment(s_crippledH1_bitlayer, GAlignCenter);
 	
 	// Draw Vault Boy's Crippled Head (Really under par sleep)
 	s_crippledH2_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_H2);
-	s_crippledH2_layer = bitmap_layer_create(GRect(3, -4, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledH2_layer, s_crippledH2_bitmap);
-  bitmap_layer_set_alignment(s_crippledH2_layer, GAlignCenter);
+	s_crippledH2_bitlayer = bitmap_layer_create(GRect(3, -4, frame.size.w, 100));
+  bitmap_layer_set_bitmap(s_crippledH2_bitlayer, s_crippledH2_bitmap);
+  bitmap_layer_set_alignment(s_crippledH2_bitlayer, GAlignCenter);
 	
 	// Draw Crippled Arm (Left) (Battery <30%)
 	s_crippledAL_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_AL);
-	s_crippledAL_layer = bitmap_layer_create(GRect(30, 18, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledAL_layer, s_crippledAL_bitmap);
-  bitmap_layer_set_alignment(s_crippledAL_layer, GAlignLeft);
+	s_crippledAL_bitlayer = bitmap_layer_create(GRect(30, 18, frame.size.w, 100));
+  bitmap_layer_set_bitmap(s_crippledAL_bitlayer, s_crippledAL_bitmap);
+  bitmap_layer_set_alignment(s_crippledAL_bitlayer, GAlignLeft);
 	
 	// Draw Crippled Arm (Right) (Bluetooth Indictor)
 	s_crippledAR_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_AR);
-	s_crippledAR_layer = bitmap_layer_create(GRect(86, 19, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledAR_layer, s_crippledAR_bitmap);
-  bitmap_layer_set_alignment(s_crippledAR_layer, GAlignLeft);
+	s_crippledAR_bitlayer = bitmap_layer_create(GRect(86, 19, frame.size.w, 100));
+  bitmap_layer_set_bitmap(s_crippledAR_bitlayer, s_crippledAR_bitmap);
+  bitmap_layer_set_alignment(s_crippledAR_bitlayer, GAlignLeft);
 	
 	// Draw Crippled Leg (Left) (Less than the weekly average steps)
 	s_crippledLL_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_LL);
-	s_crippledLL_layer = bitmap_layer_create(GRect(34, 60, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledLL_layer, s_crippledLL_bitmap);
-  bitmap_layer_set_alignment(s_crippledLL_layer, GAlignLeft);
+	s_crippledLL_bitlayer = bitmap_layer_create(GRect(34, 60, frame.size.w, 100));
+  bitmap_layer_set_bitmap(s_crippledLL_bitlayer, s_crippledLL_bitmap);
+  bitmap_layer_set_alignment(s_crippledLL_bitlayer, GAlignLeft);
 	
 	// Draw Crippled Leg (Right) (Less than half the weekly average steps)
 	s_crippledLR_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_LR);
-	s_crippledLR_layer = bitmap_layer_create(GRect(72, 60, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledLR_layer, s_crippledLR_bitmap);
-  bitmap_layer_set_alignment(s_crippledLR_layer, GAlignLeft);
+	s_crippledLR_bitlayer = bitmap_layer_create(GRect(72, 60, frame.size.w, 100));
+  bitmap_layer_set_bitmap(s_crippledLR_bitlayer, s_crippledLR_bitmap);
+  bitmap_layer_set_alignment(s_crippledLR_bitlayer, GAlignLeft);
+	
+	// Draw Bluetooth icon
+	s_bluetooth_bitmap = gbitmap_create_with_resource(RESOURCE_ID_BLUETOOTH_ICON);
+	s_bluetooth_bitlayer = bitmap_layer_create(GRect(94, 10, frame.size.w, 100));
+  bitmap_layer_set_bitmap(s_bluetooth_bitlayer, s_bluetooth_bitmap);
+  bitmap_layer_set_alignment(s_bluetooth_bitlayer, GAlignLeft);
 	
 	// Draw Dead Vault Boy (Battery super low)
 	s_dead_bitmap = gbitmap_create_with_resource(RESOURCE_ID_DEAD);
-	s_dead_layer = bitmap_layer_create(GRect(3, 26, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_dead_layer, s_dead_bitmap);
-  bitmap_layer_set_alignment(s_dead_layer, GAlignCenter);
+	s_dead_bitlayer = bitmap_layer_create(GRect(3, 26, frame.size.w, 100));
+  bitmap_layer_set_bitmap(s_dead_bitlayer, s_dead_bitmap);
+  bitmap_layer_set_alignment(s_dead_bitlayer, GAlignCenter);
 	
 	// Create Time child layer
 	s_time_layer = text_layer_create(GRect(-8, 133, frame.size.w , 34));
@@ -364,7 +474,7 @@ static void graphics_loader(GRect frame) {
   text_layer_set_background_color(s_nextLvl_layer, GColorClear);
   text_layer_set_font(s_nextLvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_nextLvl_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_nextLvl_layer, "AS XXXXX");
+  text_layer_set_text(s_nextLvl_layer, "SG XXXXX");
 		
 	// Create Level child layer (live weather)
 	s_lvl_layer = text_layer_create(GRect(0, 121, frame.size.w, 34));
@@ -399,76 +509,31 @@ static void main_window_load(Window *window) {
 
 	// Create window and load graphics
   GRect frame = layer_get_bounds(window_layer);
+	s_canvas_layer = layer_create(frame);
 	graphics_loader(frame);  
-	weather_loader();
+	
+	layer_add_child(window_layer, bitmap_layer_get_layer(s_background_bitlayer));
+  layer_add_child(window_layer, bitmap_layer_get_layer(s_vaultBoy_bitlayer));
 
-	// Add dynamic data from subscriber processes
-	battery_update_proc();
-	bluetooth_update_proc();
-	health_update_proc();
+	layer_add_child(s_canvas_layer, s_batterybar_layer);
+	layer_add_child(s_canvas_layer, s_sleepbar_layer);
+	layer_add_child(s_canvas_layer, s_stepsbar1_layer);
+	layer_add_child(s_canvas_layer, s_stepsbar2_layer);
 	
-  // Add base layers to the Window's root layer
-	layer_add_child(window_layer, bitmap_layer_get_layer(s_background_layer));
-  layer_add_child(window_layer, bitmap_layer_get_layer(s_vaultBoy_layer));
+	layer_set_update_proc(s_batterybar_layer, draw_batterybar);
+	layer_set_update_proc(s_sleepbar_layer, draw_sleepbar);
+	layer_set_update_proc(s_stepsbar1_layer, draw_stepsbar1);
+	layer_set_update_proc(s_stepsbar2_layer, draw_stepsbar2);
+	
+	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledAR_bitlayer));
+	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledAL_bitlayer));
+	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledLR_bitlayer));
+	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledLL_bitlayer));
+	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledH1_bitlayer));
+	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledH2_bitlayer));
+	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_dead_bitlayer));
+	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_bluetooth_bitlayer));
 
-	layer_add_child(window_get_root_layer(window), s_batterybar_layer);
-	layer_add_child(window_get_root_layer(window), s_sleepbar_layer);
-	layer_add_child(window_get_root_layer(window), s_stepsbar1_layer);
-	layer_add_child(window_get_root_layer(window), s_stepsbar2_layer);
-	
-	// Add modifier layers
-	if (crippledAL) { // Battery <30%
-		if (!s_charging) {
-			layer_set_hidden(s_batterybar_layer,true);
-			layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledAL_layer));
-		}
-	}
-	else {
-		if (!s_charging){
-			layer_set_hidden(s_batterybar_layer,false);
-			layer_set_update_proc(s_batterybar_layer, draw_batterybar);
-			layer_mark_dirty(s_batterybar_layer);
-		}
-	}
-	if (crippledAR) { // Bluetooth disconnected
-		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledAR_layer));
-	}
-	if (crippledLL) { // Step counter (low)
-		layer_set_hidden(s_stepsbar1_layer,true);
-		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledLL_layer));
-	}
-	else {
-		layer_set_hidden(s_stepsbar1_layer,false);
-		layer_set_update_proc(s_stepsbar1_layer, draw_stepsbar1);
-		layer_mark_dirty(s_stepsbar1_layer);
-	}
-	if (crippledLR) { // Step counter (very low)
-		layer_set_hidden(s_stepsbar2_layer,true);
-		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledLR_layer));
-	}
-	else {
-		layer_set_hidden(s_stepsbar2_layer,false);
-		layer_set_update_proc(s_stepsbar2_layer, draw_stepsbar2);
-		layer_mark_dirty(s_stepsbar2_layer);
-	}
-	if (crippledH1) { // Sleep counter (low)
-		layer_set_hidden(s_sleepbar_layer,true);
-		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledH1_layer));
-	}
-	else if (crippledH2) { // Sleep counter (very low)
-		layer_set_hidden(s_sleepbar_layer,true);
-		layer_add_child(window_layer, bitmap_layer_get_layer(s_crippledH2_layer));
-	}
-	else {
-			layer_set_hidden(s_sleepbar_layer,false);
-			layer_set_update_proc(s_sleepbar_layer, draw_sleepbar);
-			layer_mark_dirty(s_sleepbar_layer);		
-	}
-	if (dead) { // Battery <10%
-		layer_add_child(window_layer, bitmap_layer_get_layer(s_dead_layer));
-	}
-	
-	// Add watch function layers
 	layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_battery_layer));
 	layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
@@ -476,7 +541,10 @@ static void main_window_load(Window *window) {
 	layer_add_child(window_layer, text_layer_get_layer(s_nextLvl_layer)); // Weekly step average
 	layer_add_child(window_layer, text_layer_get_layer(s_lvl_layer)); // Weather
 	layer_add_child(window_layer, text_layer_get_layer(s_heart_layer)); // Heart rate
-
+	
+	layer_add_child(window_layer, s_canvas_layer);
+	
+	layer_mark_dirty(s_canvas_layer);
 	layer_mark_dirty(window_layer);
 }
 
@@ -491,16 +559,18 @@ static void main_window_unload(Window *window) {
 	gbitmap_destroy(s_crippledH1_bitmap);
 	gbitmap_destroy(s_crippledH2_bitmap);
 	gbitmap_destroy(s_dead_bitmap);
+	gbitmap_destroy(s_bluetooth_bitmap);
 	
-	bitmap_layer_destroy(s_background_layer);
-	bitmap_layer_destroy(s_vaultBoy_layer);
-	bitmap_layer_destroy(s_crippledAL_layer);
-	bitmap_layer_destroy(s_crippledAR_layer);
-	bitmap_layer_destroy(s_crippledLL_layer);
-	bitmap_layer_destroy(s_crippledLR_layer);
-	bitmap_layer_destroy(s_crippledH1_layer);
-	bitmap_layer_destroy(s_crippledH2_layer);
-	bitmap_layer_destroy(s_dead_layer);
+	bitmap_layer_destroy(s_background_bitlayer);
+	bitmap_layer_destroy(s_vaultBoy_bitlayer);
+	bitmap_layer_destroy(s_crippledAL_bitlayer);
+	bitmap_layer_destroy(s_crippledAR_bitlayer);
+	bitmap_layer_destroy(s_crippledLL_bitlayer);
+	bitmap_layer_destroy(s_crippledLR_bitlayer);
+	bitmap_layer_destroy(s_crippledH1_bitlayer);
+	bitmap_layer_destroy(s_crippledH2_bitlayer);
+	bitmap_layer_destroy(s_dead_bitlayer);
+	bitmap_layer_destroy(s_bluetooth_bitlayer);
 
   text_layer_destroy(s_time_layer);
   text_layer_destroy(s_battery_layer);
@@ -514,37 +584,46 @@ static void main_window_unload(Window *window) {
 	layer_destroy(s_sleepbar_layer);
 	layer_destroy(s_stepsbar1_layer);
 	layer_destroy(s_stepsbar2_layer);
+	
+	layer_destroy(s_canvas_layer);
 }
 
 // INITIALIZE
 static void init(void) {
+	// Get data from Java agents
+	inbox_updater();
+	inbox_loader();
+	
+	// Load settings
+	config_load_settings();
+
 	// Init stat variables
 	s_xp_level = 0;
-	s_next_level = 0;
+	s_next_level = settings.steps_count;
 	s_head_level = 0;
-	s_headmax_level = 0;
+	s_headmax_level = settings.sleep_count;
 	s_heart_level = 0;
 	
 	// Subscribe to services
-	tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
   battery_state_service_subscribe(battery_callback);
 	connection_service_subscribe((ConnectionHandlers) {.pebble_app_connection_handler = bluetooth_callback});
 	health_service_events_subscribe(health_callback, NULL);
-
+	tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
+	
 	// Peek at services
+	s_connected = connection_service_peek_pebble_app_connection();
 	battery_callback(battery_state_service_peek());
-	bluetooth_callback(connection_service_peek_pebble_app_connection());
 	health_callback(health_service_peek_current_activities(), NULL);
-
+	
 	// Create main window element and assign to pointer
   s_main_window = window_create();
 	
 	// Set handlers to manage elements within the window
   window_set_window_handlers(s_main_window, (WindowHandlers) {.load = main_window_load,.unload = main_window_unload});
-	
-	// Show the Window on the watch, with animated=true
-  window_stack_push(s_main_window, true);
 
+	// Show the Window on the watch, no animation
+  window_stack_push(s_main_window, false);
+	
 	// Update dynamic fields
 	update_time();
 	battery_update_proc();
