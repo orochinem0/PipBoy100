@@ -65,7 +65,7 @@ Pebble.addEventListener('showConfiguration', function(e) {
 Pebble.addEventListener('webviewclosed', function(e) {
   if (e && !e.response) {return;}
   var dict = clay.getSettings(e.response);
-	//console.log(Clay.getItemsByMessageKey(MANUAL_STEPS));
+	console.log(Clay.getItemsByMessageKey("MANUAL_STEPS"));
   Pebble.sendAppMessage(dict, function(e) {
     console.log('Config sent to Pebble successfully!');
   }, function(e) {

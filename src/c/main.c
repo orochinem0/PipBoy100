@@ -12,7 +12,7 @@ static void config_default_settings() {
   settings.sleep_type = 1; // 0 = past day, 1 = avg of today's weekday, 2 = avg past week, 3 = avg past month, 4 = manual
   settings.steps_count = 8000;
   settings.sleep_count = 8 * SECONDS_PER_HOUR;
-	settings.crippled_status = 1;
+	settings.crippled_status = 0;
 }
 
 // SAVE PERSISTENT SETTINGS
@@ -276,7 +276,7 @@ static void inbox_received_handler(DictionaryIterator *iterator, void *context) 
 	}
 	if (t_MANUAL_STEPS) {
 		//settings.steps_count = (int)t_MANUAL_STEPS->value->int32;
-		APP_LOG(APP_LOG_LEVEL_INFO, "Read manual steps count: %d", (int)t_MANUAL_STEPS->value->cstring);
+		APP_LOG(APP_LOG_LEVEL_INFO, "Read manual steps count: %d", (int)t_MANUAL_STEPS->value->int32);
 	} 
 	if (t_SLEEP_TYPE) {
 		//settings.sleep_type = (int)t_SLEEP_TYPE->value->int32;
@@ -370,10 +370,10 @@ static void draw_sleepbar(Layer *layer, GContext *ctx){
 	draw_bar(c_bar_width,s_head_level,s_headmax_level,layer,ctx);
 }
 static void draw_stepsbar1(Layer *layer, GContext *ctx){
-	draw_bar(c_bar_width,s_xp_level,s_next_level,layer,ctx);
+	draw_bar(c_bar_width,s_xp_level*2,s_next_level,layer,ctx);
 }
 static void draw_stepsbar2(Layer *layer, GContext *ctx){
-	draw_bar(c_bar_width,s_xp_level,s_next_level/2,layer,ctx);
+	draw_bar(c_bar_width,s_xp_level,s_next_level,layer,ctx);
 }
 
 // GRAPHICS LOADER
