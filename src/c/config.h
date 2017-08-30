@@ -6,11 +6,18 @@
 
 // SETTINGS STRUCTURE
 typedef struct ClaySettings {
-  int steps_type;
-  int sleep_type;
-  int steps_count;
-  int sleep_count;
 	bool crippled_status;
+	int battery_breakpoint;
+	int dead_battery_breakpoint;
+	int steps_breakpoint;
+	int sleep_breakpoint;
+	bool enableSteps;
+  int steps_type;
+  int steps_count;
+	bool enableSleep;
+  int sleep_type;
+  int sleep_count;
+	bool enableHR;
 } __attribute__((__packed__)) ClaySettings;
 
 // VARIABLES
@@ -20,14 +27,15 @@ static Layer *s_canvas_layer;
 
 static int s_battery_level;
 static int s_xp_level;
+static int s_current_level;
 static int s_next_level;
 static int s_head_level;
 static int s_headmax_level;
 static int s_heart_level;
-static int s_index;
 
 static bool s_charging;
 static bool s_connected;
+static bool s_plugged;
 
 static BatteryChargeState s_battery_charge_state;
 

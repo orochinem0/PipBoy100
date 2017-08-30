@@ -11,17 +11,23 @@
             "configurable",
             "health"
         ],
-        "displayName": "Pip Boy 300",
+        "displayName": "Pip-Boy 300",
         "enableMultiJS": true,
         "messageKeys": [
             "TEMPERATURE",
             "CONDITIONS",
-            "MANUAL_STEPS",
-            "MANUAL_SLEEP",
+            "STEPS_COUNT",
+            "SLEEP_COUNT",
             "STEPS_TYPE",
             "SLEEP_TYPE",
             "CRIPPLED_STATUS",
-            "JS_CALL_TYPE"
+            "BATTERY_BREAKPOINT",
+            "DEAD_BATTERY_BREAKPOINT",
+            "STEPS_BREAKPOINT",
+            "SLEEP_BREAKPOINT",
+            "ENABLE_STEPS",
+            "ENABLE_SLEEP",
+            "ENABLE_HR"
         ],
         "projectType": "native",
         "resources": {
@@ -29,12 +35,6 @@
                 {
                     "file": "images/bluetooth.png",
                     "name": "BLUETOOTH_ICON",
-                    "targetPlatforms": null,
-                    "type": "bitmap"
-                },
-                {
-                    "file": "images/battery.png",
-                    "name": "BATTERY",
                     "targetPlatforms": null,
                     "type": "bitmap"
                 },
@@ -76,6 +76,7 @@
                 },
                 {
                     "file": "images/icon.png",
+                    "menuIcon": true,
                     "name": "ICON",
                     "targetPlatforms": null,
                     "type": "bitmap"

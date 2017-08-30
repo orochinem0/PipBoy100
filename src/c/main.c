@@ -8,11 +8,19 @@ ClaySettings settings;
 
 // DEFAULT SETTINGS
 static void config_default_settings() {
-  settings.steps_type = 0; // 0 = past day, 1 = avg of today's weekday, 2 = avg past week, 3  = avg past month, 4 = manual
-  settings.sleep_type = 1; // 0 = past day, 1 = avg of today's weekday, 2 = avg past week, 3 = avg past month, 4 = manual
-  settings.steps_count = 8000;
-  settings.sleep_count = 8 * SECONDS_PER_HOUR;
-	settings.crippled_status = 0;
+	// Step/Sleep Type Key: 0 = past day, 1 = avg of today's weekday, 2 = avg past week, 3  = avg past month, 4 = manual
+	settings.crippled_status = true;
+	settings.battery_breakpoint = 30;
+	settings.dead_battery_breakpoint = 10;
+	settings.steps_breakpoint = 50;
+	settings.sleep_breakpoint = 80;
+	settings.enableSteps = true;
+  settings.steps_type = 1;
+  settings.steps_count = 10000;
+	settings.enableSleep = 1;
+  settings.sleep_type = 1;
+  settings.sleep_count = 7;
+	settings.enableHR = true;
 }
 
 // SAVE PERSISTENT SETTINGS
@@ -23,7 +31,6 @@ static void config_save_settings() {
 // READ PERSISTENT SETTINGS
 static void config_load_settings() {
   config_default_settings();
-	config_save_settings();
   persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
 }
 
@@ -47,31 +54,37 @@ static void update_time() {
 // BATTERY UPDATE PROCESS
 static void battery_update_proc() {
 	static char s_buffer[] = "BP XXX/100";
-	
+
 	if (s_charging) {
-		snprintf(s_buffer, sizeof(s_buffer)+1, "%s", " CHARGING ");
+		snprintf(s_buffer, sizeof(s_buffer)+1, "%s", "CHARGING");
+		if (s_plugged && (s_battery_level == 100)) {
+			snprintf(s_buffer, sizeof(s_buffer)+1, "%s", "FULL");
+		}
 	}
 	else {
 		snprintf(s_buffer, sizeof(s_buffer)+1, "BP %d/100", s_battery_level);
 	}
 	
 	text_layer_set_text(s_battery_layer, s_buffer);
-	layer_set_hidden(s_batterybar_layer,(s_battery_level < 30));
+	layer_set_hidden(s_batterybar_layer,(s_battery_level <= settings.battery_breakpoint));
 	layer_set_hidden(bitmap_layer_get_layer(s_crippledAL_bitlayer),true);
 	layer_set_hidden(bitmap_layer_get_layer(s_dead_bitlayer),true);
 
-	// Cripple arm @ 30%
+	// Cripple arm if battery drops below breakpoint
 	if (settings.crippled_status) {
-		layer_set_hidden(bitmap_layer_get_layer(s_dead_bitlayer),(s_battery_level >= 30));
+		layer_set_hidden(bitmap_layer_get_layer(s_crippledAL_bitlayer),!layer_get_hidden(s_batterybar_layer));
 	}
-	// Kill Vault Boy @ 10%
-	layer_set_hidden(bitmap_layer_get_layer(s_dead_bitlayer),(s_battery_level > 10));
+	// Kill Vault Boy if battery drops below dead breakpoint
+	if (s_battery_level <= settings.dead_battery_breakpoint) {
+		layer_set_hidden(bitmap_layer_get_layer(s_dead_bitlayer),false);
+	}
 }
 
 // BATTERY HANDLER
 static void battery_callback(BatteryChargeState state) {
   s_battery_level = state.charge_percent;
 	s_charging = state.is_charging;
+	s_plugged = state.is_plugged;
 }
 
 // BLUETOOTH UPDATE PROCESS
@@ -79,8 +92,11 @@ static void bluetooth_update_proc() {
   if(!s_connected) {
 		vibes_double_pulse();
 	}
-	layer_set_hidden(bitmap_layer_get_layer(s_crippledAR_bitlayer),s_connected);
 	layer_set_hidden(bitmap_layer_get_layer(s_bluetooth_bitlayer),!s_connected);
+	layer_set_hidden(bitmap_layer_get_layer(s_crippledAR_bitlayer),true);
+	if (settings.crippled_status) {
+		layer_set_hidden(bitmap_layer_get_layer(s_crippledAR_bitlayer),!layer_get_hidden(bitmap_layer_get_layer(s_bluetooth_bitlayer)));		
+	}
 }
 
 // BLUETOOTH HANDLER
@@ -110,12 +126,12 @@ static void health_update_proc() {
 	layer_set_hidden(bitmap_layer_get_layer(s_crippledH2_bitlayer),true);
 	
 	if (settings.crippled_status) {
-		layer_set_hidden(s_stepsbar1_layer,(s_xp_level < s_next_level));
-		layer_set_hidden(s_stepsbar2_layer,((s_xp_level*2) < s_next_level));
-		layer_set_hidden(bitmap_layer_get_layer(s_crippledLL_bitlayer),(s_xp_level > s_next_level));
-		layer_set_hidden(bitmap_layer_get_layer(s_crippledLR_bitlayer),((s_xp_level*2) > s_next_level));
+		layer_set_hidden(s_stepsbar1_layer,(s_xp_level < (s_next_level*(settings.steps_breakpoint/10)/10)));
+		layer_set_hidden(s_stepsbar2_layer,(s_xp_level < (s_current_level*(settings.steps_breakpoint/10)/10)));
+		layer_set_hidden(bitmap_layer_get_layer(s_crippledLL_bitlayer),!layer_get_hidden(s_stepsbar1_layer));
+		layer_set_hidden(bitmap_layer_get_layer(s_crippledLR_bitlayer),!layer_get_hidden(s_stepsbar2_layer));
 		layer_set_hidden(bitmap_layer_get_layer(s_crippledH1_bitlayer),(s_head_level > s_headmax_level));
-		layer_set_hidden(bitmap_layer_get_layer(s_crippledH2_bitlayer),((s_head_level*0.8) > s_headmax_level));
+		layer_set_hidden(bitmap_layer_get_layer(s_crippledH2_bitlayer),((s_head_level*settings.sleep_breakpoint) >= s_headmax_level));
 	}
 }
 
@@ -124,7 +140,7 @@ static void health_callback(HealthEventType event, void *context) {
 	HealthMetric step_metric = HealthMetricStepCount;
 	HealthMetric sleep_metric = HealthMetricSleepSeconds;
 	HealthServiceAccessibilityMask mask;
-	HealthServiceTimeScope scope = HealthServiceTimeScopeOnce;
+	HealthServiceTimeScope scope = HealthServiceTimeScopeWeekly;
 	
 	time_t now = time(NULL);
 	time_t today = time_start_of_today();
@@ -135,6 +151,14 @@ static void health_callback(HealthEventType event, void *context) {
 	
 	s_xp_level = (int)health_service_sum_today(step_metric);
 	s_next_level = settings.steps_count;
+
+	mask = health_service_metric_accessible(step_metric, start, now);
+	if(mask & HealthServiceAccessibilityMaskAvailable) {
+		s_current_level = (int)health_service_aggregate_averaged(step_metric, start, now, HealthAggregationSum, scope);
+	}
+	else {
+ 		APP_LOG(APP_LOG_LEVEL_ERROR, "Step data unavailable for current level!");
+	}
 	
 	switch (settings.steps_type) {
 		case 0 :	start = day;
@@ -216,12 +240,12 @@ static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResul
 
 // JAVA ERROR LOGGING : OUTBOX SEND SUCCESS
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
-  APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Outbox send success!");
 }
 
 // JAVA OUTBOX SENT HANDLER
-static void outbox_sent_handler(DictionaryIterator *iter, void *context) {
-	/*Tuplet call_type[] = {
+/*static void outbox_sent_handler(DictionaryIterator *iter, void *context) {
+	Tuplet call_type[] = {
 	  TupletCString(JS_CALL_TYPE, "Weather"),
 	};
 	
@@ -236,20 +260,27 @@ static void outbox_sent_handler(DictionaryIterator *iter, void *context) {
     app_message_outbox_send();
   }
 
-  APP_LOG(APP_LOG_LEVEL_INFO, "All transmission complete!");*/
-}
+  APP_LOG(APP_LOG_LEVEL_INFO, "All transmission complete!");
+}*/
 
 // JAVA INBOX HANDLER
 static void inbox_received_handler(DictionaryIterator *iterator, void *context) {
 	// Read tuples for data
 	Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
 	Tuple *conditions_tuple = dict_find(iterator, MESSAGE_KEY_CONDITIONS);
-	
-	Tuple *t_MANUAL_STEPS = dict_find(iterator, MESSAGE_KEY_MANUAL_STEPS);
-	Tuple *t_MANUAL_SLEEP = dict_find(iterator, MESSAGE_KEY_MANUAL_SLEEP);
- 	Tuple *t_STEPS_TYPE = dict_find(iterator, MESSAGE_KEY_STEPS_TYPE);
- 	Tuple *t_SLEEP_TYPE = dict_find(iterator, MESSAGE_KEY_SLEEP_TYPE);
+
 	Tuple *t_CRIPPLED_STATUS = dict_find(iterator, MESSAGE_KEY_CRIPPLED_STATUS);
+	Tuple *t_BATTERY_BREAKPOINT = dict_find(iterator, MESSAGE_KEY_BATTERY_BREAKPOINT);
+	Tuple *t_DEAD_BATTERY_BREAKPOINT = dict_find(iterator, MESSAGE_KEY_DEAD_BATTERY_BREAKPOINT);
+	Tuple *t_STEPS_BREAKPOINT = dict_find(iterator, MESSAGE_KEY_STEPS_BREAKPOINT);
+	Tuple *t_SLEEP_BREAKPOINT = dict_find(iterator, MESSAGE_KEY_SLEEP_BREAKPOINT);
+	Tuple *t_ENABLE_STEPS = dict_find(iterator, MESSAGE_KEY_ENABLE_STEPS);
+ 	Tuple *t_STEPS_TYPE = dict_find(iterator, MESSAGE_KEY_STEPS_TYPE);
+	Tuple *t_STEPS_COUNT = dict_find(iterator, MESSAGE_KEY_STEPS_COUNT);
+	Tuple *t_ENABLE_SLEEP = dict_find(iterator, MESSAGE_KEY_ENABLE_SLEEP);
+ 	Tuple *t_SLEEP_TYPE = dict_find(iterator, MESSAGE_KEY_SLEEP_TYPE);
+	Tuple *t_SLEEP_COUNT = dict_find(iterator, MESSAGE_KEY_SLEEP_COUNT);
+	Tuple *t_ENABLE_HR = dict_find(iterator, MESSAGE_KEY_ENABLE_HR);
 	
 	// If there's weather data, process it
 	if(temp_tuple && conditions_tuple) {
@@ -260,34 +291,64 @@ static void inbox_received_handler(DictionaryIterator *iterator, void *context) 
   	snprintf(temperature_buffer, sizeof(temperature_buffer)+1, "%d F", (int)temp_tuple->value->int32);
   	snprintf(conditions_buffer, sizeof(conditions_buffer)+1, "%s", conditions_tuple->value->cstring);
 		
-		// Assemble full string and display
 		snprintf(weather_layer_buffer, sizeof(weather_layer_buffer)+1, "%s, %s", temperature_buffer, conditions_buffer);
 		text_layer_set_text(s_lvl_layer, weather_layer_buffer);
 	}
-			
+	
+	bool update = false;
+	if (t_CRIPPLED_STATUS || t_BATTERY_BREAKPOINT || t_DEAD_BATTERY_BREAKPOINT || t_STEPS_BREAKPOINT || t_SLEEP_BREAKPOINT || t_ENABLE_STEPS || t_STEPS_TYPE || t_STEPS_COUNT || t_ENABLE_SLEEP || t_SLEEP_TYPE || t_SLEEP_COUNT || t_ENABLE_HR) {update = true;}
+
 	// If there's config data, use it
 	if (t_CRIPPLED_STATUS){
-		settings.crippled_status = (int)t_CRIPPLED_STATUS->value->int32;
-		APP_LOG(APP_LOG_LEVEL_INFO, "Read anxiety state: %d", (int)t_CRIPPLED_STATUS->value->int32);
+		settings.crippled_status = (bool)t_CRIPPLED_STATUS->value->int8;
+	}
+	if (t_BATTERY_BREAKPOINT) {
+		settings.battery_breakpoint = (int)t_BATTERY_BREAKPOINT->value->int32;
+	}
+	if (t_DEAD_BATTERY_BREAKPOINT) {
+		settings.dead_battery_breakpoint = (int)t_DEAD_BATTERY_BREAKPOINT->value->int32;
+	}
+	if (t_STEPS_BREAKPOINT) {
+		settings.steps_breakpoint = (int)t_STEPS_BREAKPOINT->value->int32;
+	}
+	if (t_SLEEP_BREAKPOINT) {
+		settings.sleep_breakpoint = (int)t_SLEEP_BREAKPOINT->value->int32;
+	}
+	if (t_ENABLE_STEPS){
+		settings.enableSteps = (bool)t_ENABLE_STEPS->value->int8;
 	}
 	if (t_STEPS_TYPE) {
-		settings.steps_type = (int)t_STEPS_TYPE->value->int32;
-		APP_LOG(APP_LOG_LEVEL_INFO, "Read steps type: %d", (int)t_STEPS_TYPE->value->int32);
+		settings.steps_type = t_STEPS_TYPE->value->cstring[0] - '0';
 	}
-	if (t_MANUAL_STEPS) {
-		//settings.steps_count = (int)t_MANUAL_STEPS->value->int32;
-		APP_LOG(APP_LOG_LEVEL_INFO, "Read manual steps count: %d", (int)t_MANUAL_STEPS->value->int32);
+	if (t_STEPS_COUNT) {
+		if (settings.steps_type == 4) {
+			settings.steps_count = atoi(t_STEPS_COUNT->value->cstring);
+		}
 	} 
-	if (t_SLEEP_TYPE) {
-		//settings.sleep_type = (int)t_SLEEP_TYPE->value->int32;
-		APP_LOG(APP_LOG_LEVEL_INFO, "Read sleep type: %d", (int)t_SLEEP_TYPE->value->int32);
+	if (t_ENABLE_SLEEP){
+		settings.enableSleep = (bool)t_ENABLE_SLEEP->value->int8;
 	}
-	if (t_MANUAL_SLEEP) {
-		settings.sleep_count = (int)t_MANUAL_SLEEP->value->int32;
-		APP_LOG(APP_LOG_LEVEL_INFO, "Read manual sleep hours: %d", (int)t_MANUAL_SLEEP->value->int32);
+	if (t_SLEEP_TYPE) {
+		settings.sleep_type = (int)t_SLEEP_TYPE->value->cstring[0] - '0';
+	}
+	if (t_SLEEP_COUNT) {
+		if (settings.sleep_type == 4) {
+			settings.sleep_count = (int)t_SLEEP_COUNT->value->int32;
+		}
+	}
+	if (t_ENABLE_HR){
+		settings.enableHR = (bool)t_ENABLE_HR->value->int8;
 	}
 	
-	config_save_settings();
+	if (update) {
+		config_save_settings();
+		s_connected = connection_service_peek_pebble_app_connection();
+		battery_callback(battery_state_service_peek());
+		health_callback(health_service_peek_current_activities(), NULL);
+		battery_update_proc();
+		bluetooth_update_proc();
+		health_update_proc();
+	}
 }
 
 // JAVA INBOX LOADER
@@ -321,19 +382,18 @@ static void tick_handler(struct tm* tick_time, TimeUnits units_changed) {
 	if(tick_time->tm_sec == 0) {
     update_time();
 		health_callback(health_service_peek_current_activities(), NULL);
+		health_update_proc();
   }
 		
 	// Update on change
 	s_battery_charge_state = battery_state_service_peek();
 	if (charge_state_change != s_battery_charge_state.is_charging) {
-		APP_LOG(APP_LOG_LEVEL_INFO, "battery state change");
 		battery_update_proc();
 	}
 	
 	// Update on change, allegedly
 	s_connected = connection_service_peek_pebble_app_connection();	
 	if (connection_state_change != s_connected) {
-		APP_LOG(APP_LOG_LEVEL_INFO, "connection state change");
 		bluetooth_update_proc();
 	}
 	
@@ -370,10 +430,10 @@ static void draw_sleepbar(Layer *layer, GContext *ctx){
 	draw_bar(c_bar_width,s_head_level,s_headmax_level,layer,ctx);
 }
 static void draw_stepsbar1(Layer *layer, GContext *ctx){
-	draw_bar(c_bar_width,s_xp_level*2,s_next_level,layer,ctx);
+	draw_bar(c_bar_width,s_xp_level,s_next_level,layer,ctx);
 }
 static void draw_stepsbar2(Layer *layer, GContext *ctx){
-	draw_bar(c_bar_width,s_xp_level,s_next_level,layer,ctx);
+	draw_bar(c_bar_width,s_xp_level,s_current_level,layer,ctx);
 }
 
 // GRAPHICS LOADER
@@ -445,11 +505,11 @@ static void graphics_loader(GRect frame) {
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentRight);
 	
 	// Create BP child layer (Battery Level)
-	s_battery_layer = text_layer_create(GRect(-8, 4, frame.size.w, 34));
+	s_battery_layer = text_layer_create(GRect(34, 4, frame.size.w, 34));
   text_layer_set_text_color(s_battery_layer, GColorWhite);
   text_layer_set_background_color(s_battery_layer, GColorClear);
   text_layer_set_font(s_battery_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(s_battery_layer, GTextAlignmentRight);
+  text_layer_set_text_alignment(s_battery_layer, GTextAlignmentCenter);
 	text_layer_set_text(s_battery_layer, "BP XXX/100");
 
 	// Create Date child layer
@@ -599,6 +659,7 @@ static void init(void) {
 
 	// Init stat variables
 	s_xp_level = 0;
+	s_current_level = 0;
 	s_next_level = settings.steps_count;
 	s_head_level = 0;
 	s_headmax_level = settings.sleep_count;
